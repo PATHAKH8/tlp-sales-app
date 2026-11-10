@@ -1966,7 +1966,7 @@ ${currentUser && currentUser.role === 'admin' ? `
                         </div>` : '';
                 })()}
                         <button onclick="viewProductSpecs(${p.id})" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-3 rounded-xl transition flex items-center justify-center gap-2 min-h-[44px] shrink-0">
-                                    <i data-lucide="external-link" class="w-4 h-4"></i> Live Portal
+                                    <i data-lucide="external-link" class="w-4 h-4"></i> Open details
                                 </button>
                             </div>
                         </div>`;
@@ -1999,7 +1999,7 @@ ${currentUser && currentUser.role === 'admin' ? `
                         </div>` : '';
                 })()}
                         <button onclick="viewProductSpecs(${p.id})" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-3 rounded-xl transition flex items-center justify-center gap-2 min-h-[44px]">
-                                <i data-lucide="external-link" class="w-4 h-4"></i> Live Portal
+                                <i data-lucide="external-link" class="w-4 h-4"></i> Open details
                             </button>
                         </div>`;
                 }).join('');
@@ -6603,6 +6603,120 @@ Search the web now and find 3-6 real, currently-listed comparable machines for s
         }
         return '';
     };
+    // ===== Product detail screen: picture, price and key specs first, then clear actions =====
+    const TLP_MEDIA = [
+        [/working video/, 'Working video', 'play-circle'], [/described video|explainer/, 'Explainer video', 'clapperboard'],
+        [/3d/, '3D view', 'box'], [/catalogue pdf|catalog pdf|brochure/, 'Catalogue PDF', 'book-open'],
+        [/presentation|prsentation/, 'Presentation', 'presentation'], [/catalogue jpg|catalog jpg/, 'Catalogue pages', 'images'],
+        [/manual|guide/, 'User manual', 'file-text'], [/audio/, 'Audio description', 'headphones'],
+        [/video|youtube/, 'Video', 'play-circle'], [/image|photo|picture/, 'Full-size photo', 'image']
+    ];
+    function tlpMediaButtons(p) {
+        const all = (p.links && p.links.all) || {};
+        const seen = new Set(), out = [];
+        TLP_MEDIA.forEach(([re, label, icon], rank) => {
+            Object.keys(all).forEach(k => {
+                const url = all[k];
+                if (!re.test(k.toLowerCase()) || !/^https?:\/\//i.test(url) || seen.has(url) || out.some(o => o.key === k)) return;
+                seen.add(url); out.push({ key: k, label, icon, url, rank });
+            });
+        });
+        Object.keys(all).forEach(k => {
+            const url = all[k];
+            if (!/^https?:\/\//i.test(url) || seen.has(url) || out.some(o => o.key === k)) return;
+            seen.add(url); out.push({ key: k, label: k.replace(/\b\w/g, c => c.toUpperCase()), icon: 'link', url, rank: 99 });
+        });
+        const count = {};
+        out.forEach(o => { count[o.label] = (count[o.label] || 0) + 1; if (count[o.label] > 1) o.label += ' ' + count[o.label]; });
+        return out.sort((a, b) => a.rank - b.rank);
+    }
+    function tlpSetupDetailScreen() {
+        if (document.getElementById('pd-hero')) return;
+        const modal = document.getElementById('product-detail-modal');
+        const card = modal.firstElementChild, scroll = card.children[1];
+        card.classList.remove('max-w-2xl'); card.classList.add('max-w-4xl');
+        const hero = document.createElement('div'); hero.id = 'pd-hero'; hero.className = 'space-y-4';
+        scroll.insertBefore(hero, scroll.firstChild);
+        const qr = document.getElementById('qr-control-pills').closest('.bg-slate-950');
+        const det = document.createElement('details'); det.id = 'pd-qr'; det.className = 'border border-slate-200 rounded-2xl overflow-hidden';
+        det.innerHTML = '<summary class="cursor-pointer px-4 py-3 text-xs font-bold text-slate-700 bg-slate-50">QR code for the customer\'s phone</summary>';
+        qr.parentNode.insertBefore(det, qr); det.appendChild(qr);
+        const res = document.getElementById('modal-resources-container');
+        if (res) { res.classList.add('hidden'); if (res.previousElementSibling) res.previousElementSibling.classList.add('hidden'); }
+        const done = card.querySelector('button[onclick="closeProductModal()"].bg-slate-900'); if (done) done.textContent = 'Close';
+    }
+    function tlpFillDetailScreen(p) {
+        const hero = document.getElementById('pd-hero'); if (!hero) return;
+        const specs = Object.entries(p.specs || {}).filter(([k, v]) => v && String(v).length < 60).slice(0, 6);
+        const media = tlpMediaButtons(p);
+        const price = document.getElementById('modal-product-price').innerText;
+        const ref = p.model || p.sku || p.code || '';
+        const btn = 'flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-300 px-3 py-3 text-xs font-bold text-slate-800 min-h-[46px]';
+        hero.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div class="md:col-span-2">
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl h-64 md:h-72 flex items-center justify-center overflow-hidden">
+                        <img id="pd-img" alt="${escapeHtml(p.name)}" class="max-w-full max-h-full object-contain" style="display:none">
+                        <div id="pd-img-none" class="text-slate-400 text-xs font-semibold">Loading picture…</div>
+                    </div>
+                </div>
+                <div class="md:col-span-3 space-y-3 min-w-0">
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-blue-700">${escapeHtml(p.category || '')}${p.subcategory ? ' · ' + escapeHtml(p.subcategory) : ''}</p>
+                        <h3 class="text-xl font-extrabold text-slate-900 leading-tight">${escapeHtml(p.name)}</h3>
+                        ${ref ? `<p class="text-xs text-slate-500 mt-0.5">Ref: ${escapeHtml(String(ref))}</p>` : ''}
+                    </div>
+                    <div class="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">List sales price</p>
+                        <p class="text-2xl font-black text-emerald-900">${escapeHtml(price)}</p>
+                    </div>
+                    ${specs.length ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">${specs.map(([k, v]) => `<div class="flex justify-between gap-2 border-b border-slate-100 pb-1"><span class="text-slate-500 truncate">${escapeHtml(k)}</span><span class="font-semibold text-slate-800 text-right">${escapeHtml(String(v))}</span></div>`).join('')}</div>` : ''}
+                </div>
+            </div>
+            ${media.length ? `<div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Show the customer</p>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">${media.map(m => `<a href="${escapeHtml(m.url)}" target="_blank" rel="noopener" class="${btn}"><i data-lucide="${m.icon}" class="w-4 h-4 text-blue-600 shrink-0"></i><span class="truncate">${escapeHtml(m.label)}</span></a>`).join('')}</div>
+            </div>` : ''}
+            <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Send to the customer</p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button type="button" onclick="shareSpecViaWhatsApp()" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-3 min-h-[46px] flex items-center justify-center gap-2"><i data-lucide="message-circle" class="w-4 h-4"></i> WhatsApp details</button>
+                    <button type="button" onclick="tlpQuoteForCurrent()" class="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-3 min-h-[46px] flex items-center justify-center gap-2"><i data-lucide="file-text" class="w-4 h-4"></i> Quotation PDF</button>
+                    <button type="button" onclick="const d=document.getElementById('pd-qr');d.open=true;d.scrollIntoView({behavior:'smooth'})" class="rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-bold px-3 py-3 min-h-[46px] flex items-center justify-center gap-2"><i data-lucide="qr-code" class="w-4 h-4"></i> QR code</button>
+                </div>
+            </div>`;
+        const img = document.getElementById('pd-img'), none = document.getElementById('pd-img-none');
+        const list = getProductImageCandidates(p, 900).filter(Boolean); let i = 0;
+        const next = () => { if (i < list.length) img.src = list[i++]; else { img.style.display = 'none'; none.textContent = 'No picture in the sheet for this machine'; none.style.display = ''; } };
+        img.referrerPolicy = 'no-referrer';
+        img.onload = () => { img.style.display = ''; none.style.display = 'none'; };
+        img.onerror = next; next();
+        const tabs = document.getElementById('sheet-field-tabs-panel');
+        if (tabs) tabs.classList.toggle('hidden', !document.getElementById('sheet-field-tab-buttons').children.length);
+        const qr = document.getElementById('pd-qr'); if (qr) qr.open = false;
+        document.getElementById('product-detail-modal').firstElementChild.children[1].scrollTop = 0;
+        if (window.lucide) lucide.createIcons();
+    }
+    let tlpDetailProduct = null;
+    function tlpQuoteForCurrent() {
+        const p = tlpDetailProduct; if (!p) return openQuotePdf();
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        if (document.getElementById('quotepdf-modal').dataset.productId !== String(p.id)) {
+            set('qp-machine', p.name); set('qp-capacity', '');
+            set('qp-rate', Math.round(Number(p.price) || 0) || '');
+            set('qp-specs', Object.entries(p.specs || {}).filter(([k, v]) => v).map(([k, v]) => k + ' | ' + String(v).replace(/\s*\n\s*/g, ' ')).join('\n'));
+            document.getElementById('quotepdf-modal').dataset.productId = String(p.id);
+        }
+        openQuotePdf();
+    }
+    const tlpViewOriginal = viewProductSpecs;
+    viewProductSpecs = function (productId) {
+        const r = tlpViewOriginal.apply(this, arguments);
+        try { tlpDetailProduct = products.find(x => x.id === productId) || null; tlpSetupDetailScreen(); if (tlpDetailProduct) tlpFillDetailScreen(tlpDetailProduct); }
+        catch (e) { console.warn('Detail screen layout issue:', e.message); }
+        return r;
+    };
+    if (typeof openProductModal === 'undefined') window.openProductModal = id => { const hit = products.find(x => String(x.id) === String(id)); if (hit) viewProductSpecs(hit.id); };
     let cloudCompanySettings = null;
 
     function cloudDealerToLocal(row) {
