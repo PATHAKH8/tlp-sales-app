@@ -6637,6 +6637,7 @@ Search the web now and find 3-6 real, currently-listed comparable machines for s
         card.classList.remove('max-w-2xl'); card.classList.add('max-w-4xl');
         const hero = document.createElement('div'); hero.id = 'pd-hero'; hero.className = 'space-y-4';
         scroll.insertBefore(hero, scroll.firstChild);
+        const st = document.createElement('style'); st.textContent = '#modal-specs-list span{min-width:0;overflow-wrap:anywhere;flex-shrink:1!important}#modal-specs-list span:first-child{max-width:45%}'; document.head.appendChild(st);
         const qr = document.getElementById('qr-control-pills').closest('.bg-slate-950');
         const det = document.createElement('details'); det.id = 'pd-qr'; det.className = 'border border-slate-200 rounded-2xl overflow-hidden';
         det.innerHTML = '<summary class="cursor-pointer px-4 py-3 text-xs font-bold text-slate-700 bg-slate-50">QR code for the customer\'s phone</summary>';
@@ -6685,6 +6686,8 @@ Search the web now and find 3-6 real, currently-listed comparable machines for s
                     <button type="button" onclick="const d=document.getElementById('pd-qr');d.open=true;d.scrollIntoView({behavior:'smooth'})" class="rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-bold px-3 py-3 min-h-[46px] flex items-center justify-center gap-2"><i data-lucide="qr-code" class="w-4 h-4"></i> QR code</button>
                 </div>
             </div>`;
+        if (!specs.length) { const d = String(p.salesDescription || p.rawDescription || p.description || '').trim(); if (d) { const box = document.createElement('p'); box.className = 'text-xs text-slate-600 leading-relaxed'; box.style.cssText = 'display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden'; box.textContent = d; hero.querySelector('.md\\:col-span-3').appendChild(box); } }
+        setTimeout(() => { document.getElementById('product-detail-modal').firstElementChild.children[1].scrollTop = 0; }, 80);
         const img = document.getElementById('pd-img'), none = document.getElementById('pd-img-none');
         const list = getProductImageCandidates(p, 900).filter(Boolean); let i = 0;
         const next = () => { if (i < list.length) img.src = list[i++]; else { img.style.display = 'none'; none.textContent = 'No picture in the sheet for this machine'; none.style.display = ''; } };
