@@ -6586,6 +6586,23 @@ Search the web now and find 3-6 real, currently-listed comparable machines for s
     };
     // The older public webhook route is switched off so the catalog only travels through the login.
     getAppsScriptWebhookUrl = function () { return ''; };
+    // Product picture: use the "Machine Image" column, never the 3D viewer / catalogue / video links.
+    chooseRowImage = function (headers, getRawValue, getMediaValue, preferredIndex) {
+        const get = idx => (getMediaValue ? getMediaValue(idx) : '') || (getRawValue ? getRawValue(idx) : '');
+        const low = headers.map(h => String(h || '').toLowerCase());
+        const notPhoto = h => /3d|catalog|brochure|pdf|video|audio|manual/.test(h);
+        const order = [];
+        low.forEach((h, i) => { if (/machine\s*image|product\s*image|machine\s*pic|product\s*pic|photo|picture|thumbnail/.test(h) && !notPhoto(h)) order.push(i); });
+        low.forEach((h, i) => { if (h.includes('image') && !notPhoto(h) && !order.includes(i)) order.push(i); });
+        if (preferredIndex >= 0 && !notPhoto(low[preferredIndex] || '') && !order.includes(preferredIndex)) order.push(preferredIndex);
+        for (const idx of order) { const v = get(idx); if (v) return extractUrlFromSheetValue(v); }
+        for (let idx = 0; idx < headers.length; idx++) {
+            if (notPhoto(low[idx])) continue;
+            const candidate = get(idx);
+            if (candidate && isLikelyImageField(headers[idx], candidate)) return extractUrlFromSheetValue(candidate);
+        }
+        return '';
+    };
     let cloudCompanySettings = null;
 
     function cloudDealerToLocal(row) {
