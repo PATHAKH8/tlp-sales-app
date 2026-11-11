@@ -6681,7 +6681,8 @@ Search the web now and find 3-6 real, currently-listed comparable machines for s
             </div>` : ''}
             <div>
                 <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Send to the customer</p>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button type="button" onclick="tlpAddToQuote()" class="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-3 min-h-[46px] flex items-center justify-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i> Add to quote${tlpBasket.length ? ' (' + tlpBasket.length + ')' : ''}</button>
                     <button type="button" onclick="shareSpecViaWhatsApp()" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-3 min-h-[46px] flex items-center justify-center gap-2"><i data-lucide="message-circle" class="w-4 h-4"></i> WhatsApp details</button>
                     <button type="button" onclick="tlpQuoteForCurrent()" class="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-3 min-h-[46px] flex items-center justify-center gap-2"><i data-lucide="file-text" class="w-4 h-4"></i> Quotation PDF</button>
                     <button type="button" onclick="const d=document.getElementById('pd-qr');d.open=true;d.scrollIntoView({behavior:'smooth'})" class="rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-bold px-3 py-3 min-h-[46px] flex items-center justify-center gap-2"><i data-lucide="qr-code" class="w-4 h-4"></i> QR code</button>
@@ -6702,18 +6703,37 @@ Search the web now and find 3-6 real, currently-listed comparable machines for s
         if (window.lucide) lucide.createIcons();
     }
     let tlpDetailProduct = null;
+    // Quote basket: products collected with "Add to quote". The first one is the main machine in the form.
+    let tlpBasket = [];
+    const tlpBasketRemove = id => { tlpBasket = tlpBasket.filter(x => String(x) !== String(id)); };
+    const tlpBasketClear = () => { tlpBasket = []; };
+    function tlpAddToQuote() {
+        const p = tlpDetailProduct; if (!p) return;
+        if (tlpBasket.some(x => String(x) === String(p.id))) return showNotification(p.name + ' is already in the quote (' + tlpBasket.length + ' product' + (tlpBasket.length > 1 ? 's' : '') + ').', 'info');
+        tlpBasket.push(p.id); tlpFillDetailScreen(p);
+        showNotification(p.name + ' added. ' + tlpBasket.length + ' product' + (tlpBasket.length > 1 ? 's' : '') + ' in the quote. Add more, or press Quotation PDF to finish.', 'success');
+    }
     function tlpQuoteForCurrent() {
-        const p = tlpDetailProduct; if (!p) return openQuotePdf();
+        const cur = tlpDetailProduct; if (!cur) return openQuotePdf();
+        if (tlpBasket.length && !tlpBasket.some(x => String(x) === String(cur.id))) tlpBasket.push(cur.id);
+        const list = (tlpBasket.length ? tlpBasket : [cur.id]).map(id => products.find(x => String(x.id) === String(id))).filter(Boolean);
+        const p = list[0] || cur, modal = document.getElementById('quotepdf-modal');
         const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-        if (document.getElementById('quotepdf-modal').dataset.productId !== String(p.id)) {
+        const links = x => tlpMediaButtons(x).filter(m => m.label.indexOf('Full-size photo') !== 0);
+        if (modal.dataset.productId !== String(p.id)) {
             set('qp-machine', p.name); set('qp-capacity', '');
             set('qp-rate', Math.round(Number(p.price) || 0) || '');
             set('qp-specs', '');
             set('qp-desc', String(p.rawDescription || p.salesDescription || p.description || '').trim());
-            set('qp-links', tlpMediaButtons(p).filter(m => m.label.indexOf('Full-size photo') !== 0).map(m => m.label + ' | ' + m.url).join('\n'));
+            set('qp-links', links(p).map(m => m.label + ' | ' + m.url).join('\n'));
             set('qp-image-urls', getProductImageCandidates(p, 1200).filter(Boolean).join('\n'));
-            document.getElementById('quotepdf-modal').dataset.productId = String(p.id);
+            modal.dataset.productId = String(p.id);
         }
+        const old = window.qpExtraProducts || [];
+        window.qpExtraProducts = list.slice(1).map(x => old.find(o => String(o.id) === String(x.id)) || {
+            id: x.id, name: x.name, qty: 1, rate: Math.round(Number(x.price) || 0) || '', hsn: '',
+            desc: String(x.rawDescription || x.salesDescription || x.description || '').trim(),
+            links: links(x).map(m => ({ label: m.label, url: m.url })), imageUrls: getProductImageCandidates(x, 600).filter(Boolean) });
         openQuotePdf();
     }
     const tlpViewOriginal = viewProductSpecs;
@@ -7264,6 +7284,7 @@ textarea.qp-in{min-height:70px;font-family:ui-monospace,Menlo,Consolas,monospace
                     <div><label class="qp-l" for="qp-hsn">HSN code</label><input id="qp-hsn" class="qp-in" type="text" placeholder="e.g. 8462"></div>
                     <div><label class="qp-l" for="qp-hero">Machine picture (added automatically from the catalog; choose a file to replace it)</label><input id="qp-hero" class="qp-in" type="file" accept="image/jpeg,image/png" style="padding:7px"></div>
                     <div class="qp-span"><label class="qp-l" for="qp-highlights">Highlight chips, one per line: value | label</label><textarea id="qp-highlights" class="qp-in" placeholder="100 Ton | Bending force&#10;3000 mm | Table length"></textarea></div>
+                    <div class="qp-span" id="qp-products"></div>
                 </div>
             </div>
 
@@ -7408,7 +7429,11 @@ function qpRead() {
     const qtyN = parseFloat(g('qp-qty')) || 1;
     const rate = parseFloat(g('qp-rate')) || 0;
     const items = [];
-    if (machine) items.push({ desc: machine + (cap ? ' — ' + cap : ''), hsn: g('qp-hsn') || '—', qtyText: qtyN + (qtyN > 1 ? ' Sets' : ' Set'), q: qtyN, rate });
+    const linkList = id => qpLines(id).filter(c => /^https?:\/\//i.test(c[1] || '')).map(c => ({ label: c[0] || 'Link', url: c[1] }));
+    if (machine) items.push({ catalog: true, desc: machine + (cap ? ' — ' + cap : ''), hsn: g('qp-hsn') || '—', qtyText: qtyN + (qtyN > 1 ? ' Sets' : ' Set'), q: qtyN, rate,
+        fullDesc: g('qp-desc'), links: linkList('qp-links'), imageUrls: g('qp-image-urls').split('\n').map(x => x.trim()).filter(Boolean), main: true });
+    (window.qpExtraProducts || []).forEach(x => { const q = parseFloat(x.qty) || 1; items.push({ catalog: true, desc: x.name, hsn: String(x.hsn || '').trim() || '—', qtyText: q + (q > 1 ? ' Sets' : ' Set'), q, rate: parseFloat(x.rate) || 0,
+        fullDesc: x.desc || '', links: x.links || [], imageUrls: x.imageUrls || [] }); });
     qpLines('qp-extras').forEach(c => items.push({ desc: c[0] || '', hsn: c[1] || '—', qtyText: c[2] || '1', q: parseFloat(c[2]) || 1, rate: parseFloat(c[3]) || 0 }));
     const sub = items.reduce((s, it) => s + it.q * it.rate, 0);
     const seller = qpSellerFor(g('qp-company'));
@@ -7432,7 +7457,7 @@ function qpRead() {
         site: g('qp-site').split('\n').map(s => s.trim()).filter(Boolean),
         terms: qpLines('qp-terms'),
         desc: g('qp-desc'),
-        links: qpLines('qp-links').filter(c => /^https?:\/\//i.test(c[1] || '')).map(c => ({ label: c[0] || 'Link', url: c[1] })),
+        links: linkList('qp-links'),
         imageUrls: g('qp-image-urls').split('\n').map(x => x.trim()).filter(Boolean),
         layout: g('qp-layout') || 'onepage',
         heroFile: (qpEl('qp-hero') && qpEl('qp-hero').files && qpEl('qp-hero').files[0]) || null
@@ -7469,6 +7494,23 @@ function qpRefreshNo() {
     el.value = (typeof tlpApi === 'function' && localStorage.getItem('tlp_session_token')) ? base + '  (final number is issued when the quote is created)' : qpNextNo(base);
 }
 
+window.qpExtraProducts = window.qpExtraProducts || [];
+function qpRenderProducts() {
+    const box = qpEl('qp-products'); if (!box) return;
+    const list = window.qpExtraProducts, esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    box.innerHTML = list.length ? '<p class="qp-l" style="margin-top:6px">More products in this quote (' + list.length + ')</p>' + list.map((x, i) =>
+        '<div style="display:grid;grid-template-columns:1fr 70px 110px 80px auto;gap:6px;align-items:center;margin-bottom:6px">'
+        + '<span style="font-size:12px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(x.name) + '</span>'
+        + '<input class="qp-in" type="number" min="1" value="' + esc(x.qty) + '" title="Quantity" oninput="qpExtraProducts[' + i + '].qty=this.value">'
+        + '<input class="qp-in" type="number" min="0" value="' + esc(x.rate) + '" title="Rate, Rs. ex-GST" oninput="qpExtraProducts[' + i + '].rate=this.value">'
+        + '<input class="qp-in" type="text" value="' + esc(x.hsn || '') + '" placeholder="HSN" oninput="qpExtraProducts[' + i + '].hsn=this.value">'
+        + '<button type="button" onclick="qpRemoveProduct(' + i + ')" style="color:#e11d48;font-weight:800;font-size:12px;padding:6px">Remove</button></div>').join('')
+        + '<button type="button" onclick="qpClearProducts()" style="font-size:11px;font-weight:700;color:#475569;text-decoration:underline">Remove all extra products</button>'
+        : '<p class="qp-hint">To quote several machines together, open each machine and press "Add to quote".</p>';
+}
+function qpRemoveProduct(i) { const x = window.qpExtraProducts.splice(i, 1)[0]; if (x && typeof tlpBasketRemove === 'function') tlpBasketRemove(x.id); qpRenderProducts(); }
+function qpClearProducts() { window.qpExtraProducts.length = 0; if (typeof tlpBasketClear === 'function') tlpBasketClear(); qpRenderProducts(); }
+
 function openQuotePdf() {
     const sel = qpEl('qp-design');
     if (sel && sel.options.length <= 1) {
@@ -7488,6 +7530,7 @@ function openQuotePdf() {
     if (qpEl('qp-date') && !qpEl('qp-date').value) qpEl('qp-date').value = qpToday();
     if (qpEl('qp-terms') && !qpEl('qp-terms').value.trim()) qpEl('qp-terms').value = QP_DEFAULT_TERMS;
     qpRefreshNo();
+    qpRenderProducts();
     const m = qpEl('quotepdf-modal');
     m.classList.remove('hidden'); m.classList.add('flex');
 }
@@ -7588,6 +7631,15 @@ async function generateQuotePdf() {
             const bytes = await qpLoadImage(v.imageUrls);
             if (bytes) hero = await out.embedJpg(bytes);
             else pictureNote = ' Note: the machine picture could not be added automatically; choose an image file in the form to include one.';
+        }
+        const catalogItems = v.items.filter(it => it.catalog);
+        if (catalogItems.length > 1) {
+            st.textContent = 'Adding the product pictures…';
+            for (const it of catalogItems) {
+                if (it.main) { it.img = hero; continue; }
+                const bytes = it.imageUrls.length ? await qpLoadImage(it.imageUrls.slice(0, 4)) : null;
+                it.img = bytes ? await out.embedJpg(bytes) : null;
+            }
         }
 
         // 3. Quote pages sit on the About-Us page frame (page 2 of the master).
@@ -7885,6 +7937,96 @@ async function generateQuotePdf() {
             LINE(rxS, QP_R, y + 30, C.grey, 0.6);
             T('Authorised Signatory', rxS, y + 40, 7.8, { color: C.grey });
             y += 60;
+        } else if (catalogItems.length > 1) {
+            // ---- Several products: picture table first, then terms and bank; details follow on the next page ----
+            startPage('Quotation', 'Quotation', catalogItems.length + ' products');
+            const mini = t => { ensure(14); T(t.toUpperCase(), QP_L, y + 7, 6.8, { bold: true, color: C.red }); y += 11; };
+            y = 128;
+            const fromAddr = SL.addr + '\n' + SL.contact;
+            const cw = 237.5, ch = Math.max(cardHeight(v.customer, v.addr), cardHeight(SL.name, fromAddr));
+            drawCard(QP_L, y, cw, ch, 'QUOTATION TO', 'Buyer', C.red, C.red, v.customer.toUpperCase(), v.addr,
+                'GSTIN ' + (v.gstin || '—'), 'State ' + (v.stateName ? v.stateName + ' (' + v.stateCode + ')' : '—'));
+            drawCard(QP_L + cw + 10, y, cw, ch, 'FROM', 'Seller', C.navy, C.navy, SL.name, fromAddr,
+                'GSTIN ' + SL.gstin, 'State ' + SL.stateName + ' (' + SL.stateCode + ')');
+            y += ch + 5;
+            T(fitText((v.ref ? 'Your ref: ' + v.ref + '   ·   ' : '') + 'Quotation no.: ' + v.quoteNo + '   ·   Date: ' + qpDMY(v.date) + '   ·   Valid until: ' + qpDMY(v.validUntil), 7.2, QP_R - QP_L), QP_L, y + 7, 7.2, { color: C.grey });
+            y += 14;
+
+            const cols = [22, 255, 42, 40, 60, 66], cx = [QP_L]; cols.forEach((w, i) => cx.push(cx[i] + w));
+            const head = () => {
+                R(QP_L, y, QP_R, y + 16, C.navy);
+                [['Sr.', 'c'], ['Product', 'l'], ['HSN', 'c'], ['Qty', 'c'], ['Rate (Rs.)', 'r'], ['Amount (Rs.)', 'r']].forEach(([t, a], i) => {
+                    const w = W(t, 7.2, true), x = a === 'r' ? cx[i + 1] - 5 - w : a === 'c' ? cx[i] + (cols[i] - w) / 2 : cx[i] + 5;
+                    T(t, x, y + 11, 7.2, { bold: true, color: C.white });
+                });
+                y += 16;
+            };
+            head();
+            v.items.forEach((it, i) => {
+                const rh = it.catalog ? 48 : 20;
+                if (y + rh > QP_BOT) { startPage(cur.label, cur.title + ' (contd.)', cur.subtitle); head(); }
+                const mid = y + rh / 2 + 2.6, num = (t, k, bold) => T(t, cx[k + 1] - 5 - W(t, 7.8, bold), mid, 7.8, { bold });
+                const ctr = (t, k) => T(t, cx[k] + (cols[k] - W(t, 7.8)) / 2, mid, 7.8);
+                ctr(String(i + 1), 0); ctr(fitText(it.hsn, 7.8, cols[2] - 4), 2); ctr(fitText(it.qtyText, 7.8, cols[3] - 4), 3);
+                num(qpMoney(it.rate), 4); num(qpMoney(it.q * it.rate), 5, true);
+                if (it.catalog) {
+                    const bx = cx[1] + 4, by = y + 4, bs = 40;
+                    page.drawRectangle({ x: bx, y: H - (by + bs), width: bs, height: bs, color: C.white, borderColor: C.line, borderWidth: 0.7 });
+                    if (it.img) { const fs = Math.min((bs - 4) / it.img.width, (bs - 4) / it.img.height), iw = it.img.width * fs, ih = it.img.height * fs; page.drawImage(it.img, { x: bx + (bs - iw) / 2, y: H - (by + bs) + (bs - ih) / 2, width: iw, height: ih }); }
+                    const tx = bx + bs + 7, tw = cx[2] - tx - 4;
+                    T(fitText(it.desc, 8.2, tw), tx, y + 14, 8.2, { bold: true, color: C.navy });
+                    const dl = WR(String(it.fullDesc || '').replace(/\s*\n\s*/g, ' '), 6.8, tw);
+                    dl.slice(0, 3).forEach((ln, k) => T(k === 2 && dl.length > 3 ? fitText(ln, 6.8, tw - W(' ...', 6.8)) + ' ...' : ln, tx, y + 24 + k * 8.4, 6.8, { color: C.grey }));
+                } else T(fitText(it.desc, 7.8, cols[1] - 10), cx[1] + 5, mid, 7.8);
+                LINE(QP_L, QP_R, y + rh, C.line, 0.6);
+                y += rh;
+            });
+            const tot = [{ kind: 'sub', cells: [{ t: '' }, { t: 'Sub-total', span: 4, a: 'r' }, { t: qpMoney(v.sub), a: 'r' }] }];
+            v.taxes.forEach(tx => tot.push({ kind: 'sub', cells: [{ t: '' }, { t: tx[0], span: 4, a: 'r' }, { t: qpMoney(tx[1]), a: 'r' }] }));
+            tot.push({ kind: 'total', cells: [{ t: '' }, { t: 'GRAND TOTAL', span: 4, a: 'r' }, { t: 'Rs. ' + qpMoney(v.grand), a: 'r' }] });
+            table(cols, null, tot);
+            ensure(14); T(fitText('Amount in words: ' + qpWords(v.grand), 7.4, QP_R - QP_L), QP_L, y + 6, 7.4, { bold: true, color: C.navy }); y += 14;
+
+            const terms = v.terms.map(([l, t]) => [l, (t || '').replace(/\{PRICE\}/g, qpMoney(v.sub))]);
+            if (terms.length) {
+                mini('Terms & conditions');
+                terms.forEach(([l, t]) => {
+                    const lines = WR(t, 7, QP_R - QP_L - 84); ensure(lines.length * 8.75 + 2);
+                    T(fitText(l, 7, 80), QP_L, y + 7, 7, { bold: true, color: C.navy });
+                    lines.forEach(ln => { T(ln, QP_L + 84, y + 7, 7); y += 8.75; });
+                    y += 1.5;
+                });
+            }
+            y += 6; ensure(28 + 6 + 36);
+            R(QP_L, y, QP_R, y + 28, C.navy);
+            const bank = SL.bank;
+            [[bank[0], 8, 62, 11], [bank[1], 290, 340, 11], [bank[2], 8, 62, 22], [bank[3], 290, 340, 22]].forEach(([b, lx, vx, ty], i) => {
+                T(b[0], QP_L + lx, y + ty, 6.8, { color: C.dim });
+                T(b[1], QP_L + vx, y + ty, 7.2, { bold: i !== 2, color: C.white });
+            });
+            y += 28 + 6;
+            const rxS = QP_R - 190;
+            T(fitText('For ' + SL.name, 7.4, 190), rxS, y + 8, 7.4, { bold: true, color: C.navy });
+            LINE(QP_L, QP_L + 190, y + 24, C.grey, 0.6); LINE(rxS, QP_R, y + 24, C.grey, 0.6);
+            T('Customer acceptance (signature & seal)', QP_L, y + 32, 7, { color: C.grey });
+            T('Authorised Signatory', rxS, y + 32, 7, { color: C.grey });
+            y += 36;
+
+            // Details page(s): each product with its videos, documents and full description
+            if (catalogItems.some(it => it.links.length || it.fullDesc) || v.specs.length || v.features.length || v.components.length || v.supply.length || v.site.length) {
+                startPage('Technical', 'Machine Details', 'Annexure to quotation ' + v.quoteNo);
+                catalogItems.forEach(it => {
+                    if (!it.links.length && !it.fullDesc) return;
+                    section(it.desc);
+                    if (it.links.length) linkGrid(it.links);
+                    if (it.fullDesc) describe(it.fullDesc);
+                });
+                if (v.specs.length) { section('Technical Specifications'); table([118, 124.5, 118, 124.5], [{ t: 'Parameter' }, { t: 'Value' }, { t: 'Parameter' }, { t: 'Value' }], pairRows(v.specs), true); }
+                if (v.features.length) { section('Key Features'); bullets(v.features.map(f => f[0] + (f[1] ? ': ' + f[1] : ''))); }
+                if (v.components.length) { section('Components & Brands'); table([118, 124.5, 118, 124.5], [{ t: 'Component' }, { t: 'Make' }, { t: 'Component' }, { t: 'Make' }], pairRows(v.components), true); }
+                if (v.supply.length) { section('Standard Supply'); bullets(v.supply); }
+                if (v.site.length) { section('Site Requirements (Customer Scope)'); bullets(v.site); }
+            }
         } else {
             // ---- One-page quotation: everything the customer needs on a single printable page ----
             startPage('Quotation', 'Quotation', machineLabel + (v.cap ? ' · ' + v.cap : ''));
@@ -8027,7 +8169,7 @@ async function generateQuotePdf() {
             const sv = await tlpApi({ action: 'quote_save', filename: fname, pdf_base64: btoa(b64), quote: {
                 quote_no: v.quoteNo, date: v.date, valid_until: v.validUntil, company_id: SL.id, company_name: SL.name,
                 customer: v.customer, contact: v.contact, customer_state: v.stateName, customer_gstin: v.gstin,
-                machine: machineLabel, qty: v.qtyN, amount: Math.round(v.sub * 100) / 100, grand_total: Math.round(v.grand * 100) / 100, design: D.label } });
+                machine: machineLabel + (catalogItems.length > 1 ? ' + ' + (catalogItems.length - 1) + ' more' : ''), qty: v.items.reduce((a, it) => a + (it.q || 0), 0), amount: Math.round(v.sub * 100) / 100, grand_total: Math.round(v.grand * 100) / 100, design: D.label } });
             registerNote = sv.error ? ' Note: it was NOT saved to the quote register (' + sv.error.message + ').' : ' Saved to the quote register.';
             if (!sv.error && typeof tlpQuotesChanged === 'function') tlpQuotesChanged();
         } else {
@@ -8035,6 +8177,7 @@ async function generateQuotePdf() {
             const seqKey = 'tlp_qp_seq_' + v.base;
             localStorage.setItem(seqKey, String((parseInt(localStorage.getItem(seqKey) || '0', 10)) + 1));
         }
+        if (typeof tlpBasketClear === 'function') tlpBasketClear();   // the next machine opened starts a fresh quote
         qpRefreshNo();
         st.textContent = 'Done: ' + fname + ' (' + out.getPageCount() + ' pages). Grand total Rs. ' + qpMoney(v.grand) + '.' + pictureNote + registerNote;
         if (typeof showNotification === 'function') showNotification('Quotation PDF created.', 'success');
