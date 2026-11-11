@@ -6707,7 +6707,10 @@ Search the web now and find 3-6 real, currently-listed comparable machines for s
         if (document.getElementById('quotepdf-modal').dataset.productId !== String(p.id)) {
             set('qp-machine', p.name); set('qp-capacity', '');
             set('qp-rate', Math.round(Number(p.price) || 0) || '');
-            set('qp-specs', Object.entries(p.specs || {}).filter(([k, v]) => v).map(([k, v]) => k + ' | ' + String(v).replace(/\s*\n\s*/g, ' ')).join('\n'));
+            set('qp-specs', '');
+            set('qp-desc', String(p.rawDescription || p.salesDescription || p.description || '').trim());
+            set('qp-links', tlpMediaButtons(p).filter(m => m.label.indexOf('Full-size photo') !== 0).map(m => m.label + ' | ' + m.url).join('\n'));
+            set('qp-image-urls', getProductImageCandidates(p, 1200).filter(Boolean).join('\n'));
             document.getElementById('quotepdf-modal').dataset.productId = String(p.id);
         }
         openQuotePdf();
@@ -7026,7 +7029,7 @@ textarea.qp-in{min-height:70px;font-family:ui-monospace,Menlo,Consolas,monospace
                     <div><label class="qp-l" for="qp-qty">Quantity</label><input id="qp-qty" class="qp-in" type="number" value="1" min="1"></div>
                     <div><label class="qp-l" for="qp-rate">Rate per machine, Rs. ex-GST *</label><input id="qp-rate" class="qp-in" type="number" min="0" step="0.01" placeholder="0"></div>
                     <div><label class="qp-l" for="qp-hsn">HSN code</label><input id="qp-hsn" class="qp-in" type="text" placeholder="e.g. 8462"></div>
-                    <div><label class="qp-l" for="qp-hero">Hero image (optional, JPG or PNG)</label><input id="qp-hero" class="qp-in" type="file" accept="image/jpeg,image/png" style="padding:7px"></div>
+                    <div><label class="qp-l" for="qp-hero">Machine picture (added automatically from the catalog; choose a file to replace it)</label><input id="qp-hero" class="qp-in" type="file" accept="image/jpeg,image/png" style="padding:7px"></div>
                     <div class="qp-span"><label class="qp-l" for="qp-highlights">Highlight chips, one per line: value | label</label><textarea id="qp-highlights" class="qp-in" placeholder="100 Ton | Bending force&#10;3000 mm | Table length"></textarea></div>
                 </div>
             </div>
@@ -7037,8 +7040,11 @@ textarea.qp-in{min-height:70px;font-family:ui-monospace,Menlo,Consolas,monospace
             </div>
 
             <div>
-                <p class="qp-h">5. Specifications &amp; features</p>
+                <p class="qp-h">5. Videos, description &amp; specifications</p>
                 <div class="space-y-3">
+                    <input type="hidden" id="qp-image-urls">
+                    <div><label class="qp-l" for="qp-links">Videos &amp; documents shown as tap-to-open buttons: label | link, one per line</label><textarea id="qp-links" class="qp-in" placeholder="Working video | https://youtu.be/..."></textarea></div>
+                    <div><label class="qp-l" for="qp-desc">Product description (full text; lines like "Capacity: 2500 kg" become a neat table, lines starting with - become bullets)</label><textarea id="qp-desc" class="qp-in" style="min-height:140px;font-family:inherit"></textarea></div>
                     <div><label class="qp-l" for="qp-specs">Specifications: parameter | value, one per line</label><textarea id="qp-specs" class="qp-in" placeholder="Nominal bending force | 1000 kN (100 Ton)&#10;Table length | 3000 mm"></textarea></div>
                     <div><label class="qp-l" for="qp-features">Key features: title | text, one per line</label><textarea id="qp-features" class="qp-in" placeholder="Modern control | CNC back gauge with touch screen."></textarea></div>
                     <div><label class="qp-l" for="qp-note">Highlight note (optional)</label><input id="qp-note" class="qp-in" type="text"></div>
@@ -7165,7 +7171,7 @@ function qpRead() {
     const addrLines = g('qp-address').split('\n').map(s => s.trim()).filter(Boolean);
     return {
         design: g('qp-design'), date, validUntil: qpToday(valid), base, quoteNo: qpNextNo(base),
-        customer: g('qp-customer'), attn: g('qp-attn'), addr: addrLines.join(', ') + (stateName ? ', ' + stateName : ''),
+        customer: g('qp-customer'), attn: g('qp-attn'), addr: addrLines.concat(stateName ? [stateName] : []).join(', '),
         gstin: g('qp-gstin'), stateCode, stateName, ref: g('qp-ref'),
         machine, cap, items, sub, taxes, grand, intra,
         highlights: qpLines('qp-highlights'),
@@ -7174,8 +7180,34 @@ function qpRead() {
         supply: g('qp-supply').split('\n').map(s => s.trim()).filter(Boolean),
         site: g('qp-site').split('\n').map(s => s.trim()).filter(Boolean),
         terms: qpLines('qp-terms'),
+        desc: g('qp-desc'),
+        links: qpLines('qp-links').filter(c => /^https?:\/\//i.test(c[1] || '')).map(c => ({ label: c[0] || 'Link', url: c[1] })),
+        imageUrls: g('qp-image-urls').split('\n').map(x => x.trim()).filter(Boolean),
         heroFile: (qpEl('qp-hero') && qpEl('qp-hero').files && qpEl('qp-hero').files[0]) || null
     };
+}
+
+// Loads a web picture (e.g. the machine photo from Google Drive) and returns it as JPEG bytes for the PDF.
+async function qpLoadImage(urls) {
+    for (const url of urls) {
+        try {
+            const img = await new Promise((resolve, reject) => {
+                const im = new Image(); im.crossOrigin = 'anonymous'; im.referrerPolicy = 'no-referrer';
+                const timer = setTimeout(() => reject(new Error('timeout')), 12000);
+                im.onload = () => { clearTimeout(timer); resolve(im); };
+                im.onerror = () => { clearTimeout(timer); reject(new Error('load failed')); };
+                im.src = url;
+            });
+            if (!img.naturalWidth) continue;
+            const scale = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight));
+            const c = document.createElement('canvas');
+            c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+            const ctx = c.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+            const blob = await new Promise(resolve => c.toBlob(resolve, 'image/jpeg', 0.9));
+            if (blob) return await blob.arrayBuffer();
+        } catch (e) { /* try the next address */ }
+    }
+    return null;
 }
 
 function qpRefreshNo() {
@@ -7239,15 +7271,21 @@ async function generateQuotePdf() {
         setF('partner_id__commercial_partner_id__vat', v.gstin);
         setF('client_order_ref', v.ref);
         mf.flatten();
-        const [coverPage] = await out.copyPages(master, [0]);
+        const [coverPage, aboutPage] = await out.copyPages(master, [0, 1]);
         out.addPage(coverPage);
+        out.addPage(aboutPage);                         // About Us page, unchanged (page 02)
 
-        // 2. Hero image (optional)
-        let hero = null;
+        // 2. Machine picture: a chosen file, else the product photo from the catalog
+        let hero = null, pictureNote = '';
         if (v.heroFile) {
             const bytes = await v.heroFile.arrayBuffer();
             try { hero = /png/i.test(v.heroFile.type) ? await out.embedPng(bytes) : await out.embedJpg(bytes); }
             catch (e) { throw new Error('Hero image must be a JPG or PNG file.'); }
+        } else if (v.imageUrls.length) {
+            st.textContent = 'Adding the machine picture…';
+            const bytes = await qpLoadImage(v.imageUrls);
+            if (bytes) hero = await out.embedJpg(bytes);
+            else pictureNote = ' Note: the machine picture could not be added automatically; choose an image file in the form to include one.';
         }
 
         // 3. Quote pages sit on the About-Us page frame (page 2 of the master).
@@ -7407,9 +7445,10 @@ async function generateQuotePdf() {
         para('Dear Sir / Madam, thank you for your enquiry. We are pleased to offer ' + machineLabel + (v.cap ? ' (' + v.cap + ')' : '') + ' as detailed below, along with the complete technical specification and commercial terms.', 8.6, { gap: 8 });
 
         if (hero) {
-            const imgW = 225, imgH = Math.min(170, hero.height * imgW / hero.width);
+            const imgW = 225, imgH = 170;
             ensure(imgH + 30);
-            page.drawImage(hero, { x: QP_L, y: H - (y + imgH), width: imgW, height: imgH });
+            const fitS = Math.min(imgW / hero.width, imgH / hero.height), dw = hero.width * fitS, dh = hero.height * fitS;
+            page.drawImage(hero, { x: QP_L + (imgW - dw) / 2, y: H - (y + imgH) + (imgH - dh) / 2, width: dw, height: dh });
             page.drawRectangle({ x: QP_L, y: H - (y + imgH), width: imgW, height: imgH, borderColor: C.line, borderWidth: 0.8 });
             T('Representative image. Colour and appearance may vary.', QP_L, y + imgH + 9, 6.3, { color: C.grey });
             const rx = QP_L + imgW + 14, rw = QP_R - rx;
@@ -7432,8 +7471,54 @@ async function generateQuotePdf() {
         table([28, 200, 50, 55, 75, 77], [{ t: 'Sr.', a: 'c' }, 'Description', { t: 'HSN', a: 'c' }, { t: 'Qty', a: 'c' }, { t: 'Rate (Rs.)', a: 'r' }, { t: 'Amount (Rs.)', a: 'r' }], rows);
         para('Amount in words: ' + qpWords(v.grand), 7.8, { gap: 2 });
 
-        // ---- Page B: Specifications ----
-        startPage('Technical', 'Specifications', 'Key parameters and features of the offered machine');
+        // ---- Page B: Videos & documents, description, specifications ----
+        const linkTo = (x0, t0, x1, t1, url) => page.node.addAnnot(out.context.register(out.context.obj({
+            Type: 'Annot', Subtype: 'Link', Rect: [x0, H - t1, x1, H - t0], Border: [0, 0, 0],
+            A: { Type: 'Action', S: 'URI', URI: PDFLib.PDFString.of(url) }
+        })));
+        const fitText = (s, size, maxW) => { let t = qpClean(s); if (W(t, size) <= maxW) return t; while (t.length > 4 && W(t + '...', size) > maxW) t = t.slice(0, -1); return t + '...'; };
+        const linkGrid = links => {
+            const bw = (QP_R - QP_L - 8) / 2, bh = 34;
+            for (let i = 0; i < links.length; i += 2) {
+                ensure(bh + 6);
+                [0, 1].forEach(k => {
+                    const L = links[i + k]; if (!L) return;
+                    const x = QP_L + k * (bw + 8);
+                    R(x, y, x + bw, y + bh, C.tint); R(x, y, x + 3, y + bh, C.accent);
+                    T(fitText(L.label, 8.8, bw - 60), x + 11, y + 14, 8.8, { bold: true, color: C.navy });
+                    T('Open', x + bw - 10 - W('Open', 7.4, true), y + 14, 7.4, { bold: true, color: C.red });
+                    T(fitText(L.url, 6.6, bw - 20), x + 11, y + 26, 6.6, { color: C.grey });
+                    linkTo(x, y, x + bw, y + bh, L.url);
+                });
+                y += bh + 6;
+            }
+            y += 2;
+        };
+        const describe = text => {
+            const BUL = /^\s*(?:[-*•·▪●■✓✔➤►>]|\d+[.)])\s+(.*)$/;
+            const KV = /^([^:]{2,40}):\s+(\S.*)$/;
+            let rows = [], bl = [];
+            const flush = () => {
+                if (rows.length) { table([130, 355], null, rows.map(([k, val]) => ({ cells: [{ t: k, bold: true, color: C.navy }, { t: val }] }))); rows = []; }
+                if (bl.length) { bullets(bl); bl = []; }
+            };
+            String(text).replace(/\r/g, '').split('\n').forEach(raw => {
+                const line = raw.trim();
+                if (!line) { flush(); y += 2; return; }
+                const mb = line.match(BUL), mk = line.match(KV);
+                if (mb) { if (rows.length) flush(); bl.push(mb[1]); return; }
+                if (mk && mk[1].trim().split(/\s+/).length <= 6) { if (bl.length) flush(); rows.push([mk[1].trim(), mk[2].trim()]); return; }
+                flush();
+                const heading = (/^[^.]{2,50}:$/.test(line)) || (line.length <= 50 && line === line.toUpperCase() && /[A-Z]{3}/.test(line));
+                if (heading) { ensure(26); y += 3; T(line.replace(/:$/, ''), QP_L, y + 9, 8.8, { bold: true, color: C.navy }); y += 15; }
+                else para(line, 8.4, { gap: 3 });
+            });
+            flush();
+        };
+        const hasDetails = v.links.length || v.desc || v.specs.length || v.features.length || v.note;
+        if (hasDetails) startPage('Technical', (v.specs.length || v.features.length) ? 'Specifications' : 'Machine Details', 'Videos, documents, description and key parameters of the offered machine');
+        if (v.links.length) { section('Videos & Documents (tap to open)'); linkGrid(v.links); }
+        if (v.desc) { section('Product Description'); describe(v.desc); }
         if (v.specs.length) {
             section('Technical Specifications');
             table([118, 124.5, 118, 124.5], [{ t: 'Parameter' }, { t: 'Value' }, { t: 'Parameter' }, { t: 'Value' }], pairRows(v.specs), true);
@@ -7522,7 +7607,7 @@ async function generateQuotePdf() {
         const seqKey = 'tlp_qp_seq_' + v.base;
         localStorage.setItem(seqKey, String((parseInt(localStorage.getItem(seqKey) || '0', 10)) + 1));
         qpRefreshNo();
-        st.textContent = 'Done: ' + fname + ' (' + out.getPageCount() + ' pages). Grand total Rs. ' + qpMoney(v.grand);
+        st.textContent = 'Done: ' + fname + ' (' + out.getPageCount() + ' pages). Grand total Rs. ' + qpMoney(v.grand) + '.' + pictureNote;
         if (typeof showNotification === 'function') showNotification('Quotation PDF created.', 'success');
     } catch (err) {
         console.error(err);
