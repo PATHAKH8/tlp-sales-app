@@ -6997,6 +6997,11 @@ textarea.qp-in{min-height:70px;font-family:ui-monospace,Menlo,Consolas,monospace
                 <select id="qp-design" class="qp-in">
                     <option value="">Choose a template…</option>
                 </select>
+                <label class="qp-l" for="qp-layout" style="margin-top:10px">Layout</label>
+                <select id="qp-layout" class="qp-in">
+                    <option value="onepage" selected>One page: picture, description, links, price, terms and bank on a single page</option>
+                    <option value="detailed">Detailed: separate offer, details and terms pages</option>
+                </select>
                 <p class="qp-hint">The master PDF is loaded from the TL Pathak template repo each time, so template updates there apply to new quotes automatically.</p>
             </div>
 
@@ -7183,6 +7188,7 @@ function qpRead() {
         desc: g('qp-desc'),
         links: qpLines('qp-links').filter(c => /^https?:\/\//i.test(c[1] || '')).map(c => ({ label: c[0] || 'Link', url: c[1] })),
         imageUrls: g('qp-image-urls').split('\n').map(x => x.trim()).filter(Boolean),
+        layout: g('qp-layout') || 'onepage',
         heroFile: (qpEl('qp-hero') && qpEl('qp-hero').files && qpEl('qp-hero').files[0]) || null
     };
 }
@@ -7425,53 +7431,8 @@ async function generateQuotePdf() {
             T(gstR, x + w - 10 - W(gstR, 7.4), top + h - 10, 7.4);
         };
 
-        // ---- Page A: Commercial offer ----
         const machineLabel = v.machine || v.items[0].desc;
-        startPage('Quotation', 'Commercial Offer', machineLabel + (v.cap ? ' · ' + v.cap : ''));
-        section('Quotation');
-        const toAddr = [v.addr].filter(Boolean).join('');
-        const fromAddr = QP_SELLER.addr + '\n' + QP_SELLER.contact;
-        const cw = 237.5, hT = cardHeight(v.customer, toAddr), hF = cardHeight(QP_SELLER.name, fromAddr);
-        const ch = Math.max(hT, hF);
-        ensure(ch + 10);
-        drawCard(QP_L, y, cw, ch, 'QUOTATION TO', 'Buyer', C.red, C.red, v.customer.toUpperCase(), toAddr,
-            'GSTIN ' + (v.gstin || '—'), 'State ' + (v.stateName ? v.stateName + ' (' + v.stateCode + ')' : '—'));
-        drawCard(QP_L + cw + 10, y, cw, ch, 'FROM', 'Seller', C.navy, C.navy, QP_SELLER.name, fromAddr,
-            'GSTIN ' + QP_SELLER.gstin, 'State West Bengal (19)');
-        y += ch + 12;
-        if (v.ref) para('Your reference: ' + v.ref + '   ·   Quotation no.: ' + v.quoteNo + '   ·   Date: ' + qpDMY(v.date) + '   ·   Valid until: ' + qpDMY(v.validUntil), 7.6, { color: C.grey, gap: 6 });
-        else para('Quotation no.: ' + v.quoteNo + '   ·   Date: ' + qpDMY(v.date) + '   ·   Valid until: ' + qpDMY(v.validUntil), 7.6, { color: C.grey, gap: 6 });
-        if (machineLabel) para('Sub: Quotation for ' + machineLabel, 9, { bold: true, color: C.navy, gap: 2 });
-        para('Dear Sir / Madam, thank you for your enquiry. We are pleased to offer ' + machineLabel + (v.cap ? ' (' + v.cap + ')' : '') + ' as detailed below, along with the complete technical specification and commercial terms.', 8.6, { gap: 8 });
-
-        if (hero) {
-            const imgW = 225, imgH = 170;
-            ensure(imgH + 30);
-            const fitS = Math.min(imgW / hero.width, imgH / hero.height), dw = hero.width * fitS, dh = hero.height * fitS;
-            page.drawImage(hero, { x: QP_L + (imgW - dw) / 2, y: H - (y + imgH) + (imgH - dh) / 2, width: dw, height: dh });
-            page.drawRectangle({ x: QP_L, y: H - (y + imgH), width: imgW, height: imgH, borderColor: C.line, borderWidth: 0.8 });
-            T('Representative image. Colour and appearance may vary.', QP_L, y + imgH + 9, 6.3, { color: C.grey });
-            const rx = QP_L + imgW + 14, rw = QP_R - rx;
-            let ry = y + 14;
-            WR(machineLabel, 12.5, rw, true).forEach(ln => { T(ln, rx, ry + 10, 12.5, { bold: true, color: C.navy }); ry += 15; });
-            if (v.cap) T(v.cap, rx, ry + 8, 8.4, { bold: true, color: C.red });
-            y += imgH + 16;
-        }
-        if (v.highlights.length) chips(v.highlights.map(h => ({ value: h[0] || '', label: h[1] || '' })));
-
-        section('Price Schedule');
-        const rows = v.items.map((it, i) => ({ cells: [
-            { t: String(i + 1), a: 'c' }, { t: it.desc, color: C.ink },
-            { t: it.hsn, a: 'c' }, { t: it.qtyText, a: 'c' },
-            { t: qpMoney(it.rate), a: 'r' }, { t: qpMoney(it.q * it.rate), a: 'r' }
-        ] }));
-        rows.push({ kind: 'sub', cells: [{ t: '' }, { t: 'Sub-total', span: 4, a: 'r' }, { t: qpMoney(v.sub), a: 'r' }] });
-        v.taxes.forEach(tx => rows.push({ kind: 'sub', cells: [{ t: '' }, { t: tx[0], span: 4, a: 'r' }, { t: qpMoney(tx[1]), a: 'r' }] }));
-        rows.push({ kind: 'total', cells: [{ t: '' }, { t: 'GRAND TOTAL', span: 4, a: 'r' }, { t: 'Rs. ' + qpMoney(v.grand), a: 'r' }] });
-        table([28, 200, 50, 55, 75, 77], [{ t: 'Sr.', a: 'c' }, 'Description', { t: 'HSN', a: 'c' }, { t: 'Qty', a: 'c' }, { t: 'Rate (Rs.)', a: 'r' }, { t: 'Amount (Rs.)', a: 'r' }], rows);
-        para('Amount in words: ' + qpWords(v.grand), 7.8, { gap: 2 });
-
-        // ---- Page B: Videos & documents, description, specifications ----
+        // Helpers shared by both layouts
         const linkTo = (x0, t0, x1, t1, url) => page.node.addAnnot(out.context.register(out.context.obj({
             Type: 'Annot', Subtype: 'Link', Rect: [x0, H - t1, x1, H - t0], Border: [0, 0, 0],
             A: { Type: 'Action', S: 'URI', URI: PDFLib.PDFString.of(url) }
@@ -7515,73 +7476,231 @@ async function generateQuotePdf() {
             });
             flush();
         };
-        const hasDetails = v.links.length || v.desc || v.specs.length || v.features.length || v.note;
-        if (hasDetails) startPage('Technical', (v.specs.length || v.features.length) ? 'Specifications' : 'Machine Details', 'Videos, documents, description and key parameters of the offered machine');
-        if (v.links.length) { section('Videos & Documents (tap to open)'); linkGrid(v.links); }
-        if (v.desc) { section('Product Description'); describe(v.desc); }
-        if (v.specs.length) {
-            section('Technical Specifications');
-            table([118, 124.5, 118, 124.5], [{ t: 'Parameter' }, { t: 'Value' }, { t: 'Parameter' }, { t: 'Value' }], pairRows(v.specs), true);
-        }
-        if (v.features.length) {
-            section('Key Features');
-            const fw = 237.5;
-            const fH = f => 8 + WR(f[0], 8.4, fw - 16, true).length * 11 + 2 + WR(f[1] || '', 7.3, fw - 16).length * 10 + 8;
-            for (let i = 0; i < v.features.length; i += 2) {
-                const pair = v.features.slice(i, i + 2);
-                const rh = Math.max(...pair.map(fH));
-                ensure(rh + 6);
-                pair.forEach((f, k) => {
-                    const x = QP_L + k * (fw + 10);
-                    R(x, y, x + fw, y + rh, C.tint);
-                    R(x, y + rh - 3, x + fw, y + rh, (i + k) % 4 < 2 ? C.accent : C.red);
-                    let t = y + 8 + 8.4;
-                    WR(f[0], 8.4, fw - 16, true).forEach(ln => { T(ln, x + 8, t, 8.4, { bold: true, color: C.navy }); t += 11; });
-                    t += 2;
-                    WR(f[1] || '', 7.3, fw - 16).forEach(ln => { T(ln, x + 8, t, 7.3); t += 10; });
-                });
-                y += rh + 6;
+        if (v.layout === 'detailed') {
+            startPage('Quotation', 'Commercial Offer', machineLabel + (v.cap ? ' · ' + v.cap : ''));
+            section('Quotation');
+            const toAddr = [v.addr].filter(Boolean).join('');
+            const fromAddr = QP_SELLER.addr + '\n' + QP_SELLER.contact;
+            const cw = 237.5, hT = cardHeight(v.customer, toAddr), hF = cardHeight(QP_SELLER.name, fromAddr);
+            const ch = Math.max(hT, hF);
+            ensure(ch + 10);
+            drawCard(QP_L, y, cw, ch, 'QUOTATION TO', 'Buyer', C.red, C.red, v.customer.toUpperCase(), toAddr,
+                'GSTIN ' + (v.gstin || '—'), 'State ' + (v.stateName ? v.stateName + ' (' + v.stateCode + ')' : '—'));
+            drawCard(QP_L + cw + 10, y, cw, ch, 'FROM', 'Seller', C.navy, C.navy, QP_SELLER.name, fromAddr,
+                'GSTIN ' + QP_SELLER.gstin, 'State West Bengal (19)');
+            y += ch + 12;
+            if (v.ref) para('Your reference: ' + v.ref + '   ·   Quotation no.: ' + v.quoteNo + '   ·   Date: ' + qpDMY(v.date) + '   ·   Valid until: ' + qpDMY(v.validUntil), 7.6, { color: C.grey, gap: 6 });
+            else para('Quotation no.: ' + v.quoteNo + '   ·   Date: ' + qpDMY(v.date) + '   ·   Valid until: ' + qpDMY(v.validUntil), 7.6, { color: C.grey, gap: 6 });
+            if (machineLabel) para('Sub: Quotation for ' + machineLabel, 9, { bold: true, color: C.navy, gap: 2 });
+            para('Dear Sir / Madam, thank you for your enquiry. We are pleased to offer ' + machineLabel + (v.cap ? ' (' + v.cap + ')' : '') + ' as detailed below, along with the complete technical specification and commercial terms.', 8.6, { gap: 8 });
+
+            if (hero) {
+                const imgW = 225, imgH = 170;
+                ensure(imgH + 30);
+                const fitS = Math.min(imgW / hero.width, imgH / hero.height), dw = hero.width * fitS, dh = hero.height * fitS;
+                page.drawImage(hero, { x: QP_L + (imgW - dw) / 2, y: H - (y + imgH) + (imgH - dh) / 2, width: dw, height: dh });
+                page.drawRectangle({ x: QP_L, y: H - (y + imgH), width: imgW, height: imgH, borderColor: C.line, borderWidth: 0.8 });
+                T('Representative image. Colour and appearance may vary.', QP_L, y + imgH + 9, 6.3, { color: C.grey });
+                const rx = QP_L + imgW + 14, rw = QP_R - rx;
+                let ry = y + 14;
+                WR(machineLabel, 12.5, rw, true).forEach(ln => { T(ln, rx, ry + 10, 12.5, { bold: true, color: C.navy }); ry += 15; });
+                if (v.cap) T(v.cap, rx, ry + 8, 8.4, { bold: true, color: C.red });
+                y += imgH + 16;
+            }
+            if (v.highlights.length) chips(v.highlights.map(h => ({ value: h[0] || '', label: h[1] || '' })));
+
+            section('Price Schedule');
+            const rows = v.items.map((it, i) => ({ cells: [
+                { t: String(i + 1), a: 'c' }, { t: it.desc, color: C.ink },
+                { t: it.hsn, a: 'c' }, { t: it.qtyText, a: 'c' },
+                { t: qpMoney(it.rate), a: 'r' }, { t: qpMoney(it.q * it.rate), a: 'r' }
+            ] }));
+            rows.push({ kind: 'sub', cells: [{ t: '' }, { t: 'Sub-total', span: 4, a: 'r' }, { t: qpMoney(v.sub), a: 'r' }] });
+            v.taxes.forEach(tx => rows.push({ kind: 'sub', cells: [{ t: '' }, { t: tx[0], span: 4, a: 'r' }, { t: qpMoney(tx[1]), a: 'r' }] }));
+            rows.push({ kind: 'total', cells: [{ t: '' }, { t: 'GRAND TOTAL', span: 4, a: 'r' }, { t: 'Rs. ' + qpMoney(v.grand), a: 'r' }] });
+            table([28, 200, 50, 55, 75, 77], [{ t: 'Sr.', a: 'c' }, 'Description', { t: 'HSN', a: 'c' }, { t: 'Qty', a: 'c' }, { t: 'Rate (Rs.)', a: 'r' }, { t: 'Amount (Rs.)', a: 'r' }], rows);
+            para('Amount in words: ' + qpWords(v.grand), 7.8, { gap: 2 });
+
+            // ---- Page B: Videos & documents, description, specifications ----
+            const hasDetails = v.links.length || v.desc || v.specs.length || v.features.length || v.note;
+            if (hasDetails) startPage('Technical', (v.specs.length || v.features.length) ? 'Specifications' : 'Machine Details', 'Videos, documents, description and key parameters of the offered machine');
+            if (v.links.length) { section('Videos & Documents (tap to open)'); linkGrid(v.links); }
+            if (v.desc) { section('Product Description'); describe(v.desc); }
+            if (v.specs.length) {
+                section('Technical Specifications');
+                table([118, 124.5, 118, 124.5], [{ t: 'Parameter' }, { t: 'Value' }, { t: 'Parameter' }, { t: 'Value' }], pairRows(v.specs), true);
+            }
+            if (v.features.length) {
+                section('Key Features');
+                const fw = 237.5;
+                const fH = f => 8 + WR(f[0], 8.4, fw - 16, true).length * 11 + 2 + WR(f[1] || '', 7.3, fw - 16).length * 10 + 8;
+                for (let i = 0; i < v.features.length; i += 2) {
+                    const pair = v.features.slice(i, i + 2);
+                    const rh = Math.max(...pair.map(fH));
+                    ensure(rh + 6);
+                    pair.forEach((f, k) => {
+                        const x = QP_L + k * (fw + 10);
+                        R(x, y, x + fw, y + rh, C.tint);
+                        R(x, y + rh - 3, x + fw, y + rh, (i + k) % 4 < 2 ? C.accent : C.red);
+                        let t = y + 8 + 8.4;
+                        WR(f[0], 8.4, fw - 16, true).forEach(ln => { T(ln, x + 8, t, 8.4, { bold: true, color: C.navy }); t += 11; });
+                        t += 2;
+                        WR(f[1] || '', 7.3, fw - 16).forEach(ln => { T(ln, x + 8, t, 7.3); t += 10; });
+                    });
+                    y += rh + 6;
+                }
+            }
+            if (v.note) { y += 4; para('Highlight: ' + v.note, 7.6, { gap: 4 }); }
+
+            // ---- Page C: Terms ----
+            startPage('Terms', 'Terms & Conditions', 'Components, supply scope, commercial terms and bank details');
+            if (v.components.length) {
+                section('Components & Brands');
+                table([118, 124.5, 118, 124.5], [{ t: 'Component' }, { t: 'Make' }, { t: 'Component' }, { t: 'Make' }], pairRows(v.components), true);
+            }
+            if (v.supply.length) { section('Standard Supply'); bullets(v.supply); }
+            if (v.site.length) { section('Site Requirements (Customer Scope)'); bullets(v.site); }
+            if (v.terms.length) {
+                section('Commercial Terms & Conditions');
+                table([96, 389], null, v.terms.map(([l, t]) => ({ cells: [
+                    { t: l, bold: true, color: C.navy },
+                    { t: (t || '').replace(/\{PRICE\}/g, qpMoney(v.sub)) }
+                ] })));
+            }
+            section('Bank Details');
+            ensure(56);
+            R(QP_L, y, QP_R, y + 46, C.navy);
+            const bank = QP_SELLER.bank;
+            T(bank[0][0], QP_L + 8, y + 16, 7.8, { color: C.dim });
+            T(bank[0][1], QP_L + 84, y + 16, 7.8, { bold: true, color: C.white });
+            T(bank[1][0], QP_L + 290, y + 16, 7.8, { color: C.dim });
+            T(bank[1][1], QP_L + 360, y + 16, 7.8, { bold: true, color: C.white });
+            T(bank[2][0], QP_L + 8, y + 34, 7.8, { color: C.dim });
+            T(bank[2][1], QP_L + 84, y + 34, 7.8, { color: C.white });
+            T(bank[3][0], QP_L + 290, y + 34, 7.8, { color: C.dim });
+            T(bank[3][1], QP_L + 360, y + 34, 7.8, { bold: true, color: C.white });
+            y += 58;
+            ensure(70);
+            LINE(QP_L, QP_L + 190, y + 30, C.grey, 0.6);
+            T('Customer Acceptance', QP_L, y + 40, 7.8, { bold: true, color: C.navy });
+            T('Signature & Company Seal', QP_L, y + 50, 7, { color: C.grey });
+            const rxS = QP_R - 190;
+            T('For PATHAK INDUSTRIES KOL', rxS, y + 10, 7.8, { bold: true, color: C.navy });
+            LINE(rxS, QP_R, y + 30, C.grey, 0.6);
+            T('Authorised Signatory', rxS, y + 40, 7.8, { color: C.grey });
+            y += 60;
+        } else {
+            // ---- One-page quotation: everything the customer needs on a single printable page ----
+            startPage('Quotation', 'Quotation', machineLabel + (v.cap ? ' · ' + v.cap : ''));
+            const mini = t => { T(t.toUpperCase(), QP_L, y + 7, 6.8, { bold: true, color: C.red }); y += 11; };
+            y = 128;
+            const fromAddr = QP_SELLER.addr + '\n' + QP_SELLER.contact;
+            const cw = 237.5, ch = Math.max(cardHeight(v.customer, v.addr), cardHeight(QP_SELLER.name, fromAddr));
+            drawCard(QP_L, y, cw, ch, 'QUOTATION TO', 'Buyer', C.red, C.red, v.customer.toUpperCase(), v.addr,
+                'GSTIN ' + (v.gstin || '—'), 'State ' + (v.stateName ? v.stateName + ' (' + v.stateCode + ')' : '—'));
+            drawCard(QP_L + cw + 10, y, cw, ch, 'FROM', 'Seller', C.navy, C.navy, QP_SELLER.name, fromAddr,
+                'GSTIN ' + QP_SELLER.gstin, 'State West Bengal (19)');
+            y += ch + 5;
+            T(fitText((v.ref ? 'Your ref: ' + v.ref + '   ·   ' : '') + 'Quotation no.: ' + v.quoteNo + '   ·   Date: ' + qpDMY(v.date) + '   ·   Valid until: ' + qpDMY(v.validUntil), 7.2, QP_R - QP_L), QP_L, y + 7, 7.2, { color: C.grey });
+            y += 13;
+
+            // Machine: fixed picture box on the left, name and description on the right
+            const boxH = 128, picW = 150, top = y;
+            page.drawRectangle({ x: QP_L, y: H - (top + boxH), width: picW, height: boxH, color: C.white, borderColor: C.line, borderWidth: 0.8 });
+            if (hero) {
+                const fs = Math.min((picW - 12) / hero.width, (boxH - 12) / hero.height), iw = hero.width * fs, ih = hero.height * fs;
+                page.drawImage(hero, { x: QP_L + (picW - iw) / 2, y: H - (top + boxH) + (boxH - ih) / 2, width: iw, height: ih });
+            } else T('Machine picture', QP_L + (picW - W('Machine picture', 7)) / 2, top + boxH / 2, 7, { color: C.grey });
+            R(QP_L + picW + 8, top, QP_R, top + boxH, C.tint);
+            R(QP_L + picW + 8, top, QP_L + picW + 11, top + boxH, C.accent);
+            const dx = QP_L + picW + 20, dw = QP_R - dx - 10; let dy = top + 8;
+            WR(machineLabel, 11, dw, true).slice(0, 2).forEach(ln => { T(ln, dx, dy + 10, 11, { bold: true, color: C.navy }); dy += 13; });
+            if (v.cap) { T(fitText(v.cap, 8, dw), dx, dy + 8, 8, { bold: true, color: C.red }); dy += 11; }
+            dy += 3;
+            const dsz = 7.4, dlh = 9.4, maxLines = Math.max(0, Math.floor((top + boxH - 6 - dy) / dlh)), dl = [];
+            String(v.desc || '').replace(/\r/g, '').split('\n').map(x => x.trim()).filter(Boolean).forEach(par => WR(par, dsz, dw).forEach(l => dl.push(l)));
+            const descCut = dl.length > maxLines, shown = dl.slice(0, maxLines);
+            if (descCut && shown.length) shown[shown.length - 1] = fitText(shown[shown.length - 1], dsz, dw - W(' ... (continued overleaf)', dsz)) + ' ... (continued overleaf)';
+            shown.forEach(ln => { T(ln, dx, dy + dsz, dsz); dy += dlh; });
+            y = top + boxH + 7;
+
+            if (v.links.length) {
+                mini('Videos & documents — tap to open');
+                const pw = (QP_R - QP_L - 10) / 3, ph = 16;
+                for (let i = 0; i < v.links.length; i += 3) {
+                    [0, 1, 2].forEach(k => {
+                        const L = v.links[i + k]; if (!L) return;
+                        const x = QP_L + k * (pw + 5);
+                        R(x, y, x + pw, y + ph, C.tint); R(x, y, x + 3, y + ph, C.accent);
+                        T(fitText(L.label, 7.4, pw - 44), x + 9, y + 11, 7.4, { bold: true, color: C.navy });
+                        T('Open', x + pw - 7 - W('Open', 6.6, true), y + 11, 6.6, { bold: true, color: C.red });
+                        linkTo(x, y, x + pw, y + ph, L.url);
+                    });
+                    y += ph + 4;
+                }
+                y += 3;
+            }
+
+            mini('Price schedule');
+            const rows = v.items.map((it, i) => ({ cells: [
+                { t: String(i + 1), a: 'c' }, { t: it.desc, color: C.ink },
+                { t: it.hsn, a: 'c' }, { t: it.qtyText, a: 'c' },
+                { t: qpMoney(it.rate), a: 'r' }, { t: qpMoney(it.q * it.rate), a: 'r' }
+            ] }));
+            rows.push({ kind: 'sub', cells: [{ t: '' }, { t: 'Sub-total', span: 4, a: 'r' }, { t: qpMoney(v.sub), a: 'r' }] });
+            v.taxes.forEach(tx => rows.push({ kind: 'sub', cells: [{ t: '' }, { t: tx[0], span: 4, a: 'r' }, { t: qpMoney(tx[1]), a: 'r' }] }));
+            rows.push({ kind: 'total', cells: [{ t: '' }, { t: 'GRAND TOTAL', span: 4, a: 'r' }, { t: 'Rs. ' + qpMoney(v.grand), a: 'r' }] });
+            table([28, 200, 50, 55, 75, 77], [{ t: 'Sr.', a: 'c' }, 'Description', { t: 'HSN', a: 'c' }, { t: 'Qty', a: 'c' }, { t: 'Rate (Rs.)', a: 'r' }, { t: 'Amount (Rs.)', a: 'r' }], rows);
+            T(fitText('Amount in words: ' + qpWords(v.grand), 7.4, QP_R - QP_L), QP_L, y + 6, 7.4, { bold: true, color: C.navy });
+            y += 14;
+
+            // Terms: the text size steps down until they fit above the bank details and signatures
+            const terms = v.terms.map(([l, t]) => [l, (t || '').replace(/\{PRICE\}/g, qpMoney(v.sub))]);
+            const tailH = 6 + 28 + 6 + 34, lw = 84, tw = QP_R - QP_L - lw;
+            let termsOver = false;
+            if (terms.length) {
+                let tsz = 0;
+                for (const sz of [7.2, 6.8, 6.4, 6]) {
+                    const hgt = terms.reduce((a, [l, t]) => a + Math.max(1, WR(t, sz, tw).length) * sz * 1.25 + 1.5, 0);
+                    if (y + 11 + hgt + tailH <= QP_BOT) { tsz = sz; break; }
+                }
+                if (tsz) {
+                    mini('Terms & conditions');
+                    terms.forEach(([l, t]) => {
+                        T(fitText(l, tsz, lw - 4), QP_L, y + tsz, tsz, { bold: true, color: C.navy });
+                        WR(t, tsz, tw).forEach((ln, i) => { T(ln, QP_L + lw, y + tsz, tsz); y += tsz * 1.25; });
+                        y += 1.5;
+                    });
+                } else { termsOver = true; T('Terms & conditions: please see the next page.', QP_L, y + 7, 7.2, { color: C.grey }); y += 12; }
+            }
+            y += 6;
+            R(QP_L, y, QP_R, y + 28, C.navy);
+            const bank = QP_SELLER.bank;
+            [[bank[0], 8, 62, 11], [bank[1], 290, 340, 11], [bank[2], 8, 62, 22], [bank[3], 290, 340, 22]].forEach(([b, lx, vx, ty], i) => {
+                T(b[0], QP_L + lx, y + ty, 6.8, { color: C.dim });
+                T(b[1], QP_L + vx, y + ty, 7.2, { bold: i !== 2, color: C.white });
+            });
+            y += 28 + 6;
+            const rxS = QP_R - 190;
+            T('For PATHAK INDUSTRIES KOL', rxS, y + 8, 7.4, { bold: true, color: C.navy });
+            LINE(QP_L, QP_L + 190, y + 24, C.grey, 0.6); LINE(rxS, QP_R, y + 24, C.grey, 0.6);
+            T('Customer acceptance (signature & seal)', QP_L, y + 32, 7, { color: C.grey });
+            T('Authorised Signatory', rxS, y + 32, 7, { color: C.grey });
+            y += 36;
+
+            // Anything that does not belong on the single page goes on an annexure page
+            if (descCut || termsOver || v.specs.length || v.features.length || v.components.length || v.supply.length || v.site.length) {
+                startPage('Technical', 'Machine Details', 'Annexure to quotation ' + v.quoteNo);
+                if (descCut) { section('Product Description'); describe(v.desc); }
+                if (v.specs.length) { section('Technical Specifications'); table([118, 124.5, 118, 124.5], [{ t: 'Parameter' }, { t: 'Value' }, { t: 'Parameter' }, { t: 'Value' }], pairRows(v.specs), true); }
+                if (v.features.length) { section('Key Features'); bullets(v.features.map(f => f[0] + (f[1] ? ': ' + f[1] : ''))); }
+                if (v.note) para('Highlight: ' + v.note, 7.6, { gap: 4 });
+                if (v.components.length) { section('Components & Brands'); table([118, 124.5, 118, 124.5], [{ t: 'Component' }, { t: 'Make' }, { t: 'Component' }, { t: 'Make' }], pairRows(v.components), true); }
+                if (v.supply.length) { section('Standard Supply'); bullets(v.supply); }
+                if (v.site.length) { section('Site Requirements (Customer Scope)'); bullets(v.site); }
+                if (termsOver) { section('Commercial Terms & Conditions'); table([96, 389], null, terms.map(([l, t]) => ({ cells: [{ t: l, bold: true, color: C.navy }, { t }] }))); }
             }
         }
-        if (v.note) { y += 4; para('Highlight: ' + v.note, 7.6, { gap: 4 }); }
-
-        // ---- Page C: Terms ----
-        startPage('Terms', 'Terms & Conditions', 'Components, supply scope, commercial terms and bank details');
-        if (v.components.length) {
-            section('Components & Brands');
-            table([118, 124.5, 118, 124.5], [{ t: 'Component' }, { t: 'Make' }, { t: 'Component' }, { t: 'Make' }], pairRows(v.components), true);
-        }
-        if (v.supply.length) { section('Standard Supply'); bullets(v.supply); }
-        if (v.site.length) { section('Site Requirements (Customer Scope)'); bullets(v.site); }
-        if (v.terms.length) {
-            section('Commercial Terms & Conditions');
-            table([96, 389], null, v.terms.map(([l, t]) => ({ cells: [
-                { t: l, bold: true, color: C.navy },
-                { t: (t || '').replace(/\{PRICE\}/g, qpMoney(v.sub)) }
-            ] })));
-        }
-        section('Bank Details');
-        ensure(56);
-        R(QP_L, y, QP_R, y + 46, C.navy);
-        const bank = QP_SELLER.bank;
-        T(bank[0][0], QP_L + 8, y + 16, 7.8, { color: C.dim });
-        T(bank[0][1], QP_L + 84, y + 16, 7.8, { bold: true, color: C.white });
-        T(bank[1][0], QP_L + 290, y + 16, 7.8, { color: C.dim });
-        T(bank[1][1], QP_L + 360, y + 16, 7.8, { bold: true, color: C.white });
-        T(bank[2][0], QP_L + 8, y + 34, 7.8, { color: C.dim });
-        T(bank[2][1], QP_L + 84, y + 34, 7.8, { color: C.white });
-        T(bank[3][0], QP_L + 290, y + 34, 7.8, { color: C.dim });
-        T(bank[3][1], QP_L + 360, y + 34, 7.8, { bold: true, color: C.white });
-        y += 58;
-        ensure(70);
-        LINE(QP_L, QP_L + 190, y + 30, C.grey, 0.6);
-        T('Customer Acceptance', QP_L, y + 40, 7.8, { bold: true, color: C.navy });
-        T('Signature & Company Seal', QP_L, y + 50, 7, { color: C.grey });
-        const rxS = QP_R - 190;
-        T('For PATHAK INDUSTRIES KOL', rxS, y + 10, 7.8, { bold: true, color: C.navy });
-        LINE(rxS, QP_R, y + 30, C.grey, 0.6);
-        T('Authorised Signatory', rxS, y + 40, 7.8, { color: C.grey });
-        y += 60;
 
         // 4. Closing pages (Our Presence etc.) unchanged from the master
         const closingIdx = [];
