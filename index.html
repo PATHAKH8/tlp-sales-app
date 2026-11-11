@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- pdf-lib: builds quotation PDFs in the browser -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
     <!-- Premium Google Inter Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -6880,6 +6881,230 @@ Search the web now and find 3-6 real, currently-listed comparable machines for s
         localStorage.removeItem('tlp_cached_catalog'); localStorage.removeItem('tlp_cache_owner');
         location.reload();
     };
+    // ===== Admin: companies & team permissions. Everyone: quotation register. =====
+    const tlpE = s => escapeHtml(String(s ?? ''));
+    const TLP_IN = 'w-full border border-slate-200 rounded-lg px-2.5 py-2 text-xs bg-white';
+    const TLP_BTN = 'rounded-lg px-3 py-2 text-xs font-bold';
+    let tlpTeam = [], tlpQuotes = [], tlpEditCompany = null;
+    const tlpIsAdmin = () => !!currentUser && currentUser.role === 'admin';
+    const tlpCompanyName = id => { const c = qpCompanies.find(x => String(x.id) === String(id)); return c ? (c.branch || c.city || c.name) : ''; };
+    async function tlpLoadCompanies() {
+        const r = await dataClient.from('companies').select('*').order('name');
+        if (!r.error) qpCompanies = r.data || [];
+        return qpCompanies;
+    }
+
+    // ---------- Companies ----------
+    const TLP_COMPANY_FIELDS = [
+        ['name', 'Company name as printed *', 'PATHAK ENGINEERS'], ['branch', 'Branch label', 'Bengaluru Showroom'],
+        ['address', 'Address (street, area)', ''], ['city', 'City', 'Bengaluru'], ['pincode', 'PIN code', ''],
+        ['state_code', 'State', 'state'], ['gstin', 'GSTIN', ''], ['email', 'Email', 'info@pathak.in'], ['phone', 'Phone', ''], ['website', 'Website', 'www.tlpathakgroup.com'],
+        ['bank_account_name', 'Bank: account name', ''], ['bank_branch', 'Bank: bank and branch', 'ICICI Bank, Salkia Branch, Howrah'], ['bank_account_no', 'Bank: account number', ''], ['bank_ifsc', 'Bank: IFSC', ''],
+        ['cover_city', 'City marked red on the cover', 'city'], ['quote_prefix', 'Quotation number prefix', 'TLPG/QT/'], ['jurisdiction', 'Jurisdiction line', 'Subject to Bengaluru (Karnataka) jurisdiction.']
+    ];
+    function tlpCompanyForm(c) {
+        const field = ([k, label, hint]) => {
+            const v = c[k] ?? '';
+            let input;
+            if (hint === 'state') input = `<select id="co-${k}" class="${TLP_IN}">${QP_STATES.map(s => `<option value="${s[0]}" ${String(v).padStart(2, '0') === s[0] || (!v && s[0] === '19') ? 'selected' : ''}>${s[0]} ${tlpE(s[1])}</option>`).join('')}</select>`;
+            else if (hint === 'city') input = `<select id="co-${k}" class="${TLP_IN}">${['Howrah', 'Kolkata', 'Bengaluru', 'Coimbatore', 'Cuttack', 'Bhubaneswar', 'Ludhiana', 'Dubai'].map(n => `<option ${String(v || 'Howrah').toLowerCase() === n.toLowerCase() ? 'selected' : ''}>${n}</option>`).join('')}</select>`;
+            else input = `<input id="co-${k}" class="${TLP_IN}" value="${tlpE(v)}" placeholder="${tlpE(hint)}">`;
+            return `<label class="block"><span class="block text-[10px] font-semibold text-slate-500 mb-1">${tlpE(label)}</span>${input}</label>`;
+        };
+        return `<div class="rounded-xl border border-blue-200 bg-blue-50/40 p-3 space-y-3">
+            <p class="text-xs font-bold text-slate-800">${c.id ? 'Edit company' : 'Add a company / branch'}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">${TLP_COMPANY_FIELDS.map(field).join('')}</div>
+            <div class="flex flex-wrap items-center gap-4 text-xs">
+                <label class="flex items-center gap-2"><input type="checkbox" id="co-is_default" ${c.is_default === true ? 'checked' : ''}> Default company for new quotes</label>
+                <label class="flex items-center gap-2"><input type="checkbox" id="co-active" ${c.active === false ? '' : 'checked'}> Active (shown in the quote form)</label>
+            </div>
+            <div class="flex gap-2"><button type="button" onclick="tlpSaveCompany()" class="${TLP_BTN} bg-blue-600 text-white">Save company</button><button type="button" onclick="tlpEditCompany=null;tlpRenderAdmin()" class="${TLP_BTN} bg-white border border-slate-300 text-slate-700">Cancel</button></div>
+        </div>`;
+    }
+    async function tlpSaveCompany() {
+        const val = k => (document.getElementById('co-' + k)?.value || '').trim();
+        const row = {}; TLP_COMPANY_FIELDS.forEach(([k]) => { row[k] = val(k); });
+        row.is_default = document.getElementById('co-is_default').checked; row.active = document.getElementById('co-active').checked;
+        row.updated_at = new Date().toISOString();
+        if (!row.name) return showNotification('Enter the company name.', 'error');
+        const id = tlpEditCompany && tlpEditCompany.id;
+        const r = id ? await dataClient.from('companies').update(row).eq('id', id).select().single() : await dataClient.from('companies').insert(row).select().single();
+        if (r.error) return showNotification('Could not save the company: ' + r.error.message, 'error');
+        if (row.is_default) for (const o of qpCompanies) if (o.is_default === true && String(o.id) !== String(r.data.id)) await dataClient.from('companies').update({ is_default: false }).eq('id', o.id);
+        tlpEditCompany = null; await tlpLoadCompanies(); tlpRenderAdmin();
+        showNotification('Company saved. It is now available in the quote form.', 'success');
+    }
+    async function tlpDeleteCompany(id) {
+        if (!confirm('Remove this company? Existing quotations are not affected.')) return;
+        const r = await dataClient.from('companies').delete().eq('id', id);
+        if (r.error) return showNotification(r.error.message, 'error');
+        await tlpLoadCompanies(); tlpRenderAdmin();
+    }
+
+    // ---------- Team ----------
+    async function tlpLoadTeam() { const r = await dataClient.from('profiles').select('*').order('full_name'); if (!r.error) tlpTeam = r.data || []; return tlpTeam; }
+    async function tlpSetUser(id, key, value) {
+        const r = await dataClient.from('profiles').update({ [key]: value, updated_at: new Date().toISOString() }).eq('id', id);
+        if (r.error) { showNotification('Could not update: ' + r.error.message, 'error'); await tlpLoadTeam(); tlpRenderAdmin(); return; }
+        const u = tlpTeam.find(x => String(x.id) === String(id)); if (u) u[key] = value;
+        showNotification('Saved.', 'success');
+        if (typeof loadCloudUsers === 'function') loadCloudUsers();
+    }
+    async function tlpAddUser() {
+        const g = id => document.getElementById(id);
+        const body = { action: 'user_create', name: g('nu-name').value.trim(), email: g('nu-email').value.trim(), password: g('nu-pass').value, role: g('nu-role').value, company_id: g('nu-company').value,
+            can_view_cost: g('nu-cost').checked, can_edit_prices: g('nu-prices').checked, can_see_all_quotes: g('nu-quotes').checked };
+        const r = await tlpApi(body);
+        if (r.error) return showNotification(r.error.message, 'error');
+        await tlpLoadTeam(); tlpRenderAdmin();
+        showNotification('User added. Give them the email and temporary password to sign in.', 'success');
+    }
+    async function tlpResetPassword(id) {
+        const el = document.getElementById('pw-' + id); const pw = el ? el.value : '';
+        if (pw.length < 8) return showNotification('Password must be at least 8 characters.', 'error');
+        const r = await tlpApi({ action: 'user_password', user_id: id, password: pw });
+        if (r.error) return showNotification(r.error.message, 'error');
+        el.value = ''; showNotification('Password changed.', 'success');
+    }
+    async function tlpRemoveUser(id) {
+        if (!confirm('Remove this user? They will no longer be able to sign in.')) return;
+        const r = await dataClient.from('profiles').delete().eq('id', id);
+        if (r.error) return showNotification(r.error.message, 'error');
+        await tlpLoadTeam(); tlpRenderAdmin();
+    }
+
+    function tlpRenderAdmin() {
+        const tab = document.getElementById('tab-admin'); if (!tab || !tlpIsAdmin()) return;
+        let panel = document.getElementById('tlp-admin-panel');
+        if (!panel) { panel = document.createElement('div'); panel.id = 'tlp-admin-panel'; panel.className = 'space-y-4'; tab.insertBefore(panel, tab.firstChild); }
+        const chk = (u, key, label) => `<label class="flex items-center gap-1.5 whitespace-nowrap"><input type="checkbox" ${u[key] === true ? 'checked' : ''} ${u.role === 'admin' && key !== 'approved' ? 'checked disabled' : ''} onchange="tlpSetUser('${u.id}','${key}',this.checked)"> ${label}</label>`;
+        const coOpts = sel => `<option value="">No fixed branch</option>` + qpCompanies.map(c => `<option value="${tlpE(c.id)}" ${String(sel || '') === String(c.id) ? 'selected' : ''}>${tlpE(c.branch || c.city || c.name)}</option>`).join('');
+        panel.innerHTML = `
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+                <div><h3 class="font-bold text-slate-900 text-sm">Companies &amp; branches</h3><p class="text-[11px] text-slate-500">The company chosen in the quote form decides the name, address, GSTIN, bank details, GST type and the city marked on the cover.</p></div>
+                <button type="button" onclick="tlpEditCompany={};tlpRenderAdmin()" class="${TLP_BTN} bg-slate-900 text-white">+ Add company</button>
+            </div>
+            ${tlpEditCompany ? tlpCompanyForm(tlpEditCompany) : ''}
+            ${qpCompanies.length ? `<div class="overflow-x-auto"><table class="w-full text-xs text-left"><thead><tr class="text-slate-500 border-b border-slate-200"><th class="py-2 pr-3">Company</th><th class="py-2 pr-3">Branch / city</th><th class="py-2 pr-3">GSTIN</th><th class="py-2 pr-3">Cover city</th><th class="py-2 pr-3">Prefix</th><th class="py-2"></th></tr></thead><tbody>${qpCompanies.map(c => `<tr class="border-b border-slate-100"><td class="py-2 pr-3 font-semibold text-slate-800">${tlpE(c.name)} ${c.is_default === true ? '<span class="ml-1 text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">Default</span>' : ''}${c.active === false ? '<span class="ml-1 text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full">Inactive</span>' : ''}</td><td class="py-2 pr-3">${tlpE(c.branch || c.city || '')}</td><td class="py-2 pr-3">${tlpE(c.gstin || '')}</td><td class="py-2 pr-3">${tlpE(c.cover_city || '')}</td><td class="py-2 pr-3">${tlpE(c.quote_prefix || 'TLPG/QT/')}</td><td class="py-2 text-right whitespace-nowrap"><button type="button" class="text-blue-700 font-bold mr-3" onclick="tlpEditCompany=qpCompanies.find(x=>String(x.id)==='${tlpE(c.id)}');tlpRenderAdmin()">Edit</button><button type="button" class="text-rose-600 font-bold" onclick="tlpDeleteCompany('${tlpE(c.id)}')">Remove</button></td></tr>`).join('')}</tbody></table></div>`
+              : '<p class="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">No companies added yet. Until you add one, quotes use Pathak Industries Kol (Howrah).</p>'}
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
+            <div><h3 class="font-bold text-slate-900 text-sm">Team &amp; permissions</h3><p class="text-[11px] text-slate-500">Add people directly, or approve those who registered themselves. Changes are saved as you tick.</p></div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+                <p class="text-xs font-bold text-slate-800">Add a user</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                    <input id="nu-name" class="${TLP_IN}" placeholder="Full name"><input id="nu-email" class="${TLP_IN}" type="email" placeholder="Email (their login)"><input id="nu-pass" class="${TLP_IN}" type="text" placeholder="Temporary password (8+)">
+                    <select id="nu-role" class="${TLP_IN}"><option value="sales">Sales</option><option value="admin">Administrator</option></select><select id="nu-company" class="${TLP_IN}">${coOpts('')}</select>
+                </div>
+                <div class="flex flex-wrap items-center gap-4 text-xs">
+                    <label class="flex items-center gap-1.5"><input type="checkbox" id="nu-cost"> Can see purchase rates</label>
+                    <label class="flex items-center gap-1.5"><input type="checkbox" id="nu-prices"> Can edit prices</label>
+                    <label class="flex items-center gap-1.5"><input type="checkbox" id="nu-quotes"> Can see everyone's quotes</label>
+                    <button type="button" onclick="tlpAddUser()" class="${TLP_BTN} bg-blue-600 text-white">Add user</button>
+                </div>
+            </div>
+            <div class="space-y-2">${tlpTeam.map(u => `<div class="rounded-xl border border-slate-200 p-3 text-xs space-y-2">
+                <div class="flex items-center justify-between gap-2 flex-wrap"><div><span class="font-bold text-slate-900">${tlpE(u.full_name || u.email)}</span> <span class="text-slate-500">${tlpE(u.email)}</span>${u.approved === true ? '' : ' <span class="ml-1 text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Waiting for approval</span>'}</div>
+                    <div class="flex items-center gap-2"><select class="${TLP_IN}" style="width:auto" onchange="tlpSetUser('${u.id}','role',this.value)" ${String(u.id) === String(currentUser.id) ? 'disabled' : ''}><option value="sales" ${u.role !== 'admin' ? 'selected' : ''}>Sales</option><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Administrator</option></select>
+                    <select class="${TLP_IN}" style="width:auto" onchange="tlpSetUser('${u.id}','company_id',this.value)">${coOpts(u.company_id)}</select></div></div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">${chk(u, 'approved', 'Approved')}${chk(u, 'can_view_cost', 'Purchase rates')}${chk(u, 'can_edit_prices', 'Edit prices')}${chk(u, 'can_see_all_quotes', "Everyone's quotes")}
+                    <span class="flex items-center gap-1.5 ml-auto"><input id="pw-${u.id}" class="${TLP_IN}" style="width:150px" type="text" placeholder="New password"><button type="button" onclick="tlpResetPassword('${u.id}')" class="${TLP_BTN} bg-white border border-slate-300 text-slate-700">Set password</button>
+                    ${String(u.id) === String(currentUser.id) ? '' : `<button type="button" onclick="tlpRemoveUser('${u.id}')" class="${TLP_BTN} text-rose-600">Remove</button>`}</span></div>
+            </div>`).join('') || '<p class="text-xs text-slate-500">No users yet.</p>'}</div>
+        </div>`;
+    }
+
+    // ---------- Quotation register ----------
+    const TLP_STATUSES = ['Sent', 'Follow-up', 'Negotiation', 'Won', 'Lost'];
+    const tlpRupee = n => '₹' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    async function tlpLoadQuotes() { const r = await dataClient.from('quotes').select('*').order('created_at', { ascending: false }); if (r.error) { showNotification('Could not load quotations: ' + r.error.message, 'error'); return tlpQuotes; } tlpQuotes = r.data || []; return tlpQuotes; }
+    function tlpQuotesChanged() { if (document.getElementById('tlp-quotes-modal') && !document.getElementById('tlp-quotes-modal').classList.contains('hidden')) tlpLoadQuotes().then(tlpRenderQuotes); }
+    async function tlpSetQuote(id, key, value) {
+        const r = await dataClient.from('quotes').update({ [key]: value, updated_at: new Date().toISOString() }).eq('id', id);
+        if (r.error) return showNotification('Could not save: ' + r.error.message, 'error');
+        const q = tlpQuotes.find(x => String(x.id) === String(id)); if (q) q[key] = value;
+        if (key === 'status') tlpRenderQuotes();
+    }
+    function tlpQuoteWhatsApp(id) {
+        const q = tlpQuotes.find(x => String(x.id) === String(id)); if (!q) return;
+        const text = `Dear ${q.contact || q.customer},\nPlease find our quotation ${q.quote_no} for ${q.machine}.\nTotal: ${tlpRupee(q.grand_total)} (incl. GST)\n${q.pdf_url || ''}\n\n${q.company_name || 'TL Pathak Group'}`;
+        window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+    }
+    async function openQuotesRegister() {
+        let m = document.getElementById('tlp-quotes-modal');
+        if (!m) {
+            m = document.createElement('div'); m.id = 'tlp-quotes-modal';
+            m.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-end sm:items-center justify-center z-40 p-0 sm:p-4';
+            m.innerHTML = `<div class="bg-white w-full sm:max-w-6xl max-h-[94vh] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-3"><div><h3 class="font-bold text-slate-900 text-base">Quotations</h3><p class="text-[11px] text-slate-500" id="tq-sub"></p></div>
+                    <button type="button" onclick="closeQuotesRegister()" class="text-slate-400 hover:text-slate-600 p-2.5 min-h-[44px] min-w-[44px] text-lg">✕</button></div>
+                <div class="px-5 py-3 border-b border-slate-100 grid grid-cols-2 lg:grid-cols-5 gap-2">
+                    <input id="tq-search" class="${TLP_IN} col-span-2" placeholder="Search customer, machine or quote no." oninput="tlpRenderQuotes()">
+                    <select id="tq-status" class="${TLP_IN}" onchange="tlpRenderQuotes()"><option value="">All statuses</option>${TLP_STATUSES.map(s => `<option>${s}</option>`).join('')}</select>
+                    <select id="tq-company" class="${TLP_IN}" onchange="tlpRenderQuotes()"></select><select id="tq-user" class="${TLP_IN}" onchange="tlpRenderQuotes()"></select>
+                </div>
+                <div id="tq-summary" class="px-5 py-3 grid grid-cols-2 sm:grid-cols-4 gap-2 border-b border-slate-100"></div>
+                <div id="tq-list" class="flex-1 overflow-auto px-5 py-3"></div></div>`;
+            document.body.appendChild(m);
+        }
+        m.classList.remove('hidden'); m.classList.add('flex');
+        document.getElementById('tq-list').innerHTML = '<p class="text-xs text-slate-500 py-6 text-center">Loading quotations…</p>';
+        await tlpLoadQuotes();
+        const uniq = k => [...new Set(tlpQuotes.map(q => q[k]).filter(Boolean))].sort();
+        document.getElementById('tq-company').innerHTML = '<option value="">All companies</option>' + uniq('company_name').map(n => `<option>${tlpE(n)}</option>`).join('');
+        document.getElementById('tq-user').innerHTML = '<option value="">Everyone</option>' + uniq('created_by_name').map(n => `<option>${tlpE(n)}</option>`).join('');
+        document.getElementById('tq-sub').textContent = (tlpIsAdmin() || currentUser.canSeeAllQuotes) ? 'All quotations made by the team.' : 'Quotations you have made.';
+        tlpRenderQuotes();
+    }
+    function closeQuotesRegister() { const m = document.getElementById('tlp-quotes-modal'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+    function tlpRenderQuotes() {
+        const g = id => (document.getElementById(id)?.value || '');
+        const s = g('tq-search').trim().toLowerCase(), st = g('tq-status'), co = g('tq-company'), us = g('tq-user');
+        const rows = tlpQuotes.filter(q => (!st || q.status === st) && (!co || q.company_name === co) && (!us || q.created_by_name === us) && (!s || [q.customer, q.machine, q.quote_no, q.contact].join(' ').toLowerCase().includes(s)));
+        const sum = f => rows.filter(f).reduce((a, q) => a + (Number(q.grand_total) || 0), 0);
+        const tile = (label, value, tone) => `<div class="rounded-xl ${tone} px-3 py-2"><p class="text-[9px] font-bold uppercase tracking-wider opacity-70">${label}</p><p class="text-sm font-extrabold">${value}</p></div>`;
+        document.getElementById('tq-summary').innerHTML = tile('Quotations', rows.length, 'bg-slate-100 text-slate-900') + tile('Total value', tlpRupee(sum(() => true)), 'bg-blue-50 text-blue-900')
+            + tile('Won', tlpRupee(sum(q => q.status === 'Won')), 'bg-emerald-50 text-emerald-900') + tile('Open', tlpRupee(sum(q => q.status !== 'Won' && q.status !== 'Lost')), 'bg-amber-50 text-amber-900');
+        const today = new Date().toLocaleDateString('en-CA');
+        document.getElementById('tq-list').innerHTML = rows.length ? `<table class="w-full text-xs text-left min-w-[900px]"><thead><tr class="text-slate-500 border-b border-slate-200"><th class="py-2 pr-3">Date</th><th class="py-2 pr-3">Quote no.</th><th class="py-2 pr-3">Customer</th><th class="py-2 pr-3">Machine</th><th class="py-2 pr-3 text-right">Total</th><th class="py-2 pr-3">By</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3">Follow-up</th><th class="py-2 pr-3">Notes</th><th class="py-2"></th></tr></thead><tbody>${rows.map(q => `<tr class="border-b border-slate-100 align-top">
+            <td class="py-2 pr-3 whitespace-nowrap">${tlpE(String(q.date || q.created_at || '').slice(0, 10).split('-').reverse().join('/'))}</td>
+            <td class="py-2 pr-3 whitespace-nowrap font-semibold">${tlpE(q.quote_no)}</td>
+            <td class="py-2 pr-3"><span class="font-semibold text-slate-900">${tlpE(q.customer)}</span>${q.contact ? `<br><span class="text-slate-500">${tlpE(q.contact)}</span>` : ''}</td>
+            <td class="py-2 pr-3">${tlpE(q.machine)}${q.company_name ? `<br><span class="text-slate-400">${tlpE(q.company_name)}</span>` : ''}</td>
+            <td class="py-2 pr-3 text-right whitespace-nowrap font-bold">${tlpRupee(q.grand_total)}</td>
+            <td class="py-2 pr-3 whitespace-nowrap">${tlpE(q.created_by_name || '')}</td>
+            <td class="py-2 pr-3"><select class="${TLP_IN}" style="width:auto" onchange="tlpSetQuote('${q.id}','status',this.value)">${TLP_STATUSES.map(x => `<option ${q.status === x ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
+            <td class="py-2 pr-3"><input type="date" class="${TLP_IN} ${q.follow_up && String(q.follow_up).slice(0, 10) <= today && q.status !== 'Won' && q.status !== 'Lost' ? 'border-rose-400 bg-rose-50' : ''}" style="width:auto" value="${tlpE(String(q.follow_up || '').slice(0, 10))}" onchange="tlpSetQuote('${q.id}','follow_up',this.value)"></td>
+            <td class="py-2 pr-3"><input class="${TLP_IN}" style="min-width:150px" value="${tlpE(q.notes || '')}" placeholder="Add a note" onchange="tlpSetQuote('${q.id}','notes',this.value)"></td>
+            <td class="py-2 whitespace-nowrap text-right">${q.pdf_url ? `<a href="${tlpE(q.pdf_url)}" target="_blank" rel="noopener" class="text-blue-700 font-bold mr-3">PDF</a>` : ''}<button type="button" class="text-emerald-700 font-bold" onclick="tlpQuoteWhatsApp('${q.id}')">WhatsApp</button></td></tr>`).join('')}</tbody></table>`
+            : '<p class="text-xs text-slate-500 py-8 text-center">No quotations found. Quotes appear here automatically when they are created.</p>';
+    }
+
+    // ---------- Wiring ----------
+    function tlpInstallCrmUi() {
+        const anchor = document.getElementById('nav-finder');
+        if (anchor && !document.getElementById('nav-quotes')) {
+            const b = anchor.cloneNode(true); b.id = 'nav-quotes'; b.removeAttribute('onclick'); b.onclick = openQuotesRegister;
+            b.innerHTML = '<i data-lucide="file-text" class="w-5 h-5 mr-3"></i> Quotations';
+            anchor.parentNode.insertBefore(b, anchor.nextSibling);
+        }
+        const dash = document.getElementById('tab-dashboard');
+        if (dash && !document.getElementById('tlp-quotes-bar')) {
+            const bar = document.createElement('div'); bar.id = 'tlp-quotes-bar';
+            bar.className = 'bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3';
+            bar.innerHTML = `<div><p class="text-sm font-bold text-slate-900">Quotations</p><p class="text-[11px] text-slate-500">Every quote made in the app is saved here with its PDF, status and follow-up date.</p></div><button type="button" onclick="openQuotesRegister()" class="${TLP_BTN} bg-slate-900 text-white whitespace-nowrap">Open quotations</button>`;
+            dash.insertBefore(bar, dash.firstChild);
+        }
+        if (tlpIsAdmin()) tlpLoadTeam().then(tlpRenderAdmin);
+        if (window.lucide) lucide.createIcons();
+    }
+    const tlpEnterCrm = enterApplication;
+    enterApplication = async function (profile) {
+        await tlpEnterCrm(profile);
+        if (currentUser) { currentUser.companyId = profile.company_id || ''; currentUser.canSeeAllQuotes = profile.can_see_all_quotes === true; }
+        tlpLoadCompanies().then(tlpInstallCrmUi);
+    };
     window.addEventListener('load', async function () {
         try {
             const { data: { session }, error: sessionError } = await dataClient.auth.getSession();
@@ -6993,7 +7218,10 @@ textarea.qp-in{min-height:70px;font-family:ui-monospace,Menlo,Consolas,monospace
 
         <div class="p-5 space-y-6 text-sm">
             <div>
-                <p class="qp-h">1. Template (design)</p>
+                <p class="qp-h">1. Quote from &amp; template</p>
+                <label class="qp-l" for="qp-company">Quote from (company / branch)</label>
+                <select id="qp-company" class="qp-in" onchange="qpRefreshNo()" style="margin-bottom:10px"></select>
+                <label class="qp-l" for="qp-design">Template (design)</label>
                 <select id="qp-design" class="qp-in">
                     <option value="">Choose a template…</option>
                 </select>
@@ -7016,7 +7244,7 @@ textarea.qp-in{min-height:70px;font-family:ui-monospace,Menlo,Consolas,monospace
                         <select id="qp-state" class="qp-in" onchange="qpRefreshNo()">
                             <option value="01">01 Jammu &amp; Kashmir</option><option value="02">02 Himachal Pradesh</option><option value="03">03 Punjab</option><option value="04">04 Chandigarh</option><option value="05">05 Uttarakhand</option><option value="06">06 Haryana</option><option value="07">07 Delhi</option><option value="08">08 Rajasthan</option><option value="09">09 Uttar Pradesh</option><option value="10">10 Bihar</option><option value="11">11 Sikkim</option><option value="12">12 Arunachal Pradesh</option><option value="13">13 Nagaland</option><option value="14">14 Manipur</option><option value="15">15 Mizoram</option><option value="16">16 Tripura</option><option value="17">17 Meghalaya</option><option value="18">18 Assam</option><option value="19" selected>19 West Bengal</option><option value="20">20 Jharkhand</option><option value="21">21 Odisha</option><option value="22">22 Chhattisgarh</option><option value="23">23 Madhya Pradesh</option><option value="24">24 Gujarat</option><option value="26">26 Dadra &amp; Nagar Haveli and Daman &amp; Diu</option><option value="27">27 Maharashtra</option><option value="29">29 Karnataka</option><option value="30">30 Goa</option><option value="31">31 Lakshadweep</option><option value="32">32 Kerala</option><option value="33">33 Tamil Nadu</option><option value="34">34 Puducherry</option><option value="35">35 Andaman &amp; Nicobar Islands</option><option value="36">36 Telangana</option><option value="37">37 Andhra Pradesh</option><option value="38">38 Ladakh</option>
                         </select>
-                        <p class="qp-hint">West Bengal = CGST + SGST 9% each. Any other state = IGST 18%.</p>
+                        <p class="qp-hint">Same state as the selling company = CGST + SGST 9% each. Any other state = IGST 18%.</p>
                     </div>
                     <div><label class="qp-l" for="qp-gstin">Customer GSTIN</label><input id="qp-gstin" class="qp-in" type="text" placeholder="as per customer"></div>
                     <div><label class="qp-l" for="qp-ref">Your reference / PO no.</label><input id="qp-ref" class="qp-in" type="text"></div>
@@ -7097,6 +7325,22 @@ const QP_SELLER = {
     contact: 'info@pathak.in · www.tlpathakgroup.com',
     bank: [['Account Name', 'PATHAK INDUSTRIES KOL'], ['Account No.', '160605500702'], ['Bank / Branch', 'ICICI Bank, Salkia Branch, Howrah'], ['IFSC Code', 'ICIC0001606']]
 };
+let qpCompanies = [];          // filled from the Companies list after sign-in
+const QP_COVER_CITIES = { kolkata: 104, howrah: 166.8, bengaluru: 229.5, bangalore: 229.5, coimbatore: 292.3, cuttack: 355, bhubaneswar: 417.8, ludhiana: 480.5, dubai: 543.3 };
+function qpSellerFor(id) {
+    const list = qpCompanies.filter(c => c && c.active !== false && c.name);
+    const c = list.find(x => String(x.id) === String(id)) || list.find(x => x.is_default === true) || null;
+    if (!c) return { id: '', name: QP_SELLER.name, addr: QP_SELLER.addr, contact: QP_SELLER.contact, gstin: QP_SELLER.gstin, stateCode: '19', stateName: 'West Bengal', bank: QP_SELLER.bank, coverCity: 'Howrah', prefix: 'TLPG/QT/', jurisdiction: '' };
+    const st = QP_STATES.find(x => x[0] === String(c.state_code || '').padStart(2, '0'));
+    const addr = [c.address, [c.city, c.pincode].filter(Boolean).join(' – '), st ? st[1] : ''].map(x => String(x || '').trim()).filter(Boolean).join(', ');
+    return {
+        id: c.id, name: String(c.name).trim(), addr,
+        contact: [c.email || 'info@pathak.in', c.phone, c.website || 'www.tlpathakgroup.com'].filter(Boolean).join(' · '),
+        gstin: c.gstin || '—', stateCode: st ? st[0] : '19', stateName: st ? st[1] : 'West Bengal',
+        bank: [['Account Name', c.bank_account_name || String(c.name).trim()], ['Account No.', String(c.bank_account_no || '—')], ['Bank / Branch', c.bank_branch || '—'], ['IFSC Code', c.bank_ifsc || '—']],
+        coverCity: c.cover_city || c.city || 'Howrah', prefix: c.quote_prefix || 'TLPG/QT/', jurisdiction: c.jurisdiction || ''
+    };
+}
 const QP_DEFAULT_TERMS = [
     'Price | Rs. {PRICE}/- as per specification, plus GST as shown above.',
     'Delivery | As instructed by the customer. Onward freight, transit insurance and unloading are in the customer scope.',
@@ -7143,11 +7387,11 @@ const qpWords = n => {
 const qpToday = d => (d || new Date()).toLocaleDateString('en-CA');
 const qpDMY = iso => { const [y, m, d] = (iso || '').split('-'); return y && m && d ? `${d}/${m}/${y}` : '—'; };
 const qpLines = id => (qpEl(id)?.value || '').split('\n').map(s => s.trim()).filter(Boolean).map(s => s.split('|').map(x => x.trim()));
-const qpBase = iso => {
+const qpBase = (iso, prefix) => {
     const d = new Date(iso + 'T00:00:00');
     const y = d.getFullYear(), m = d.getMonth() + 1;
     const fy = m >= 4 ? y : y - 1;
-    return `TLPG/QT/${String(fy).slice(-2)}-${String(fy + 1).slice(-2)}/${String(m).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    return `${String(prefix || 'TLPG/QT/').replace(/\/?$/, '/')}${String(fy).slice(-2)}-${String(fy + 1).slice(-2)}/${String(m).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 };
 // Quote numbers per day: TLPG/QT/26-27/MMDD, then -2, -3 ... (counter kept in this browser)
 const qpNextNo = base => { const c = parseInt(localStorage.getItem('tlp_qp_seq_' + base) || '0', 10); return c ? `${base}-${c + 1}` : base; };
@@ -7167,14 +7411,16 @@ function qpRead() {
     if (machine) items.push({ desc: machine + (cap ? ' — ' + cap : ''), hsn: g('qp-hsn') || '—', qtyText: qtyN + (qtyN > 1 ? ' Sets' : ' Set'), q: qtyN, rate });
     qpLines('qp-extras').forEach(c => items.push({ desc: c[0] || '', hsn: c[1] || '—', qtyText: c[2] || '1', q: parseFloat(c[2]) || 1, rate: parseFloat(c[3]) || 0 }));
     const sub = items.reduce((s, it) => s + it.q * it.rate, 0);
-    const intra = stateCode === '19';
+    const seller = qpSellerFor(g('qp-company'));
+    const intra = stateCode === seller.stateCode;
     const taxes = intra
         ? [['CGST @ 9%', Math.round(sub * 9) / 100], ['SGST @ 9%', Math.round(sub * 9) / 100]]
         : [['IGST @ 18%', Math.round(sub * 18) / 100]];
     const grand = sub + taxes.reduce((s, t) => s + t[1], 0);
-    const base = qpBase(date);
+    const base = qpBase(date, seller.prefix);
     const addrLines = g('qp-address').split('\n').map(s => s.trim()).filter(Boolean);
     return {
+        seller, contact: g('qp-attn'), qtyN,
         design: g('qp-design'), date, validUntil: qpToday(valid), base, quoteNo: qpNextNo(base),
         customer: g('qp-customer'), attn: g('qp-attn'), addr: addrLines.concat(stateName ? [stateName] : []).join(', '),
         gstin: g('qp-gstin'), stateCode, stateName, ref: g('qp-ref'),
@@ -7218,13 +7464,25 @@ async function qpLoadImage(urls) {
 
 function qpRefreshNo() {
     const el = qpEl('qp-no');
-    if (el) el.value = qpNextNo(qpBase(qpEl('qp-date')?.value || qpToday()));
+    if (!el) return;
+    const base = qpBase(qpEl('qp-date')?.value || qpToday(), qpSellerFor(qpEl('qp-company')?.value).prefix);
+    el.value = (typeof tlpApi === 'function' && localStorage.getItem('tlp_session_token')) ? base + '  (final number is issued when the quote is created)' : qpNextNo(base);
 }
 
 function openQuotePdf() {
     const sel = qpEl('qp-design');
     if (sel && sel.options.length <= 1) {
         QP_DESIGNS.forEach(d => sel.add(new Option(d.label, d.id)));
+    }
+    const cs = qpEl('qp-company');
+    if (cs) {
+        const keep = cs.value, list = qpCompanies.filter(c => c && c.active !== false && c.name);
+        cs.innerHTML = '';
+        if (!list.length) cs.add(new Option(QP_SELLER.name + ' (Howrah)', ''));
+        list.forEach(c => cs.add(new Option(c.name + (c.branch ? ' — ' + c.branch : c.city ? ' — ' + c.city : ''), c.id)));
+        const mine = (typeof currentUser !== 'undefined' && currentUser && currentUser.companyId) || '';
+        const def = list.find(c => String(c.id) === String(keep)) || list.find(c => String(c.id) === String(mine)) || list.find(c => c.is_default === true) || list[0];
+        if (def) cs.value = def.id;
     }
     if (qpEl('qp-customer') && !qpEl('qp-customer').value) qpEl('qp-customer').value = qpEl('calc-client-name')?.value || '';
     if (qpEl('qp-date') && !qpEl('qp-date').value) qpEl('qp-date').value = qpToday();
@@ -7246,10 +7504,19 @@ async function generateQuotePdf() {
     try {
         if (!window.PDFLib) throw new Error('PDF library did not load. Check the internet connection and reload.');
         const v = qpRead();
+        const SL = v.seller;
+        if (SL.jurisdiction) v.terms = v.terms.map(([l, t]) => /^jurisdiction$/i.test(l || '') && /Howrah \(West Bengal\)/.test(t || '') ? [l, SL.jurisdiction] : [l, t]);
         if (!v.design) throw new Error('Choose a template (design) first.');
         if (!v.customer) throw new Error('Enter the customer name.');
         if (!v.machine && !v.items.length) throw new Error('Enter the machine name or at least one item.');
         const D = QP_DESIGNS.find(d => d.id === v.design);
+        // Quotation number: issued centrally so two people can never get the same one
+        let numberedCentrally = false;
+        if (typeof tlpApi === 'function' && localStorage.getItem('tlp_session_token')) {
+            st.textContent = 'Getting the quotation number…';
+            const nr = await tlpApi({ action: 'quote_number', prefix: SL.prefix, date: v.date });
+            if (nr.data && nr.data.quote_no) { v.quoteNo = nr.data.quote_no; numberedCentrally = true; }
+        }
         const { PDFDocument, StandardFonts, rgb } = PDFLib;
 
         st.textContent = 'Loading ' + D.label + ' template from GitHub…';
@@ -7280,6 +7547,35 @@ async function generateQuotePdf() {
         const [coverPage, aboutPage] = await out.copyPages(master, [0, 1]);
         out.addPage(coverPage);
         out.addPage(aboutPage);                         // About Us page, unchanged (page 02)
+
+        // Cover "Our Presence" strip: the branch the quote is made from is the one marked red
+        const cityKey = String(SL.coverCity || '').trim().toLowerCase(), cx = QP_COVER_CITIES[cityKey];
+        if (cx && cityKey !== 'howrah') {
+            let fSemi = F.bold;
+            try {
+                if (window.fontkit) {
+                    out.registerFontkit(window.fontkit);
+                    window.qpPoppins = window.qpPoppins || await (await fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-SemiBold.ttf')).arrayBuffer();
+                    fSemi = await out.embedFont(window.qpPoppins, { subset: true });
+                }
+            } catch (e) { console.warn('Brand font not available for the cover strip:', e.message); }
+            const cv = coverPage, CY = QP_H - 691.9, white = PDFLib.rgb(1, 1, 1), dark = qpHex(D.dark), red = qpHex('#d8261a');
+            const label = (name, x, size, color) => {
+                const w0 = Math.max(fSemi.widthOfTextAtSize(name, 9), 36) + 6;
+                cv.drawRectangle({ x: x - w0 / 2, y: QP_H - 716, width: w0, height: 14.6, color: white });
+                cv.drawText(name, { x: x - fSemi.widthOfTextAtSize(name, size) / 2, y: QP_H - 711.9, size, font: fSemi, color });
+            };
+            const dot = (x, hot) => {
+                cv.drawCircle({ x, y: CY, size: 8.8, color: white });
+                cv.drawLine({ start: { x: x - 9, y: CY }, end: { x: x + 9, y: CY }, thickness: 3, color: qpHex(D.accent) });
+                cv.drawCircle({ x, y: CY, size: hot ? 7 : 5.2, color: white, borderColor: hot ? red : dark, borderWidth: hot ? 2.2 : 1.8 });
+                cv.drawCircle({ x, y: CY, size: hot ? 2.2 : 1.6, color: hot ? red : dark });
+            };
+            cv.drawLine({ start: { x: 93.2, y: CY }, end: { x: 166.8, y: CY }, thickness: 3.6, color: qpHex(D.accent), lineCap: PDFLib.LineCapStyle.Round });   // the old red segment
+            dot(104, false); dot(166.8, false); dot(cx, true);
+            const proper = { bangalore: 'Bengaluru' }[cityKey] || cityKey.charAt(0).toUpperCase() + cityKey.slice(1);
+            label('Howrah', 166.8, 8.6, dark); label(proper, cx, 9, red);
+        }
 
         // 2. Machine picture: a chosen file, else the product photo from the catalog
         let hero = null, pictureNote = '';
@@ -7480,14 +7776,14 @@ async function generateQuotePdf() {
             startPage('Quotation', 'Commercial Offer', machineLabel + (v.cap ? ' · ' + v.cap : ''));
             section('Quotation');
             const toAddr = [v.addr].filter(Boolean).join('');
-            const fromAddr = QP_SELLER.addr + '\n' + QP_SELLER.contact;
-            const cw = 237.5, hT = cardHeight(v.customer, toAddr), hF = cardHeight(QP_SELLER.name, fromAddr);
+            const fromAddr = SL.addr + '\n' + SL.contact;
+            const cw = 237.5, hT = cardHeight(v.customer, toAddr), hF = cardHeight(SL.name, fromAddr);
             const ch = Math.max(hT, hF);
             ensure(ch + 10);
             drawCard(QP_L, y, cw, ch, 'QUOTATION TO', 'Buyer', C.red, C.red, v.customer.toUpperCase(), toAddr,
                 'GSTIN ' + (v.gstin || '—'), 'State ' + (v.stateName ? v.stateName + ' (' + v.stateCode + ')' : '—'));
-            drawCard(QP_L + cw + 10, y, cw, ch, 'FROM', 'Seller', C.navy, C.navy, QP_SELLER.name, fromAddr,
-                'GSTIN ' + QP_SELLER.gstin, 'State West Bengal (19)');
+            drawCard(QP_L + cw + 10, y, cw, ch, 'FROM', 'Seller', C.navy, C.navy, SL.name, fromAddr,
+                'GSTIN ' + SL.gstin, 'State ' + SL.stateName + ' (' + SL.stateCode + ')');
             y += ch + 12;
             if (v.ref) para('Your reference: ' + v.ref + '   ·   Quotation no.: ' + v.quoteNo + '   ·   Date: ' + qpDMY(v.date) + '   ·   Valid until: ' + qpDMY(v.validUntil), 7.6, { color: C.grey, gap: 6 });
             else para('Quotation no.: ' + v.quoteNo + '   ·   Date: ' + qpDMY(v.date) + '   ·   Valid until: ' + qpDMY(v.validUntil), 7.6, { color: C.grey, gap: 6 });
@@ -7570,7 +7866,7 @@ async function generateQuotePdf() {
             section('Bank Details');
             ensure(56);
             R(QP_L, y, QP_R, y + 46, C.navy);
-            const bank = QP_SELLER.bank;
+            const bank = SL.bank;
             T(bank[0][0], QP_L + 8, y + 16, 7.8, { color: C.dim });
             T(bank[0][1], QP_L + 84, y + 16, 7.8, { bold: true, color: C.white });
             T(bank[1][0], QP_L + 290, y + 16, 7.8, { color: C.dim });
@@ -7585,7 +7881,7 @@ async function generateQuotePdf() {
             T('Customer Acceptance', QP_L, y + 40, 7.8, { bold: true, color: C.navy });
             T('Signature & Company Seal', QP_L, y + 50, 7, { color: C.grey });
             const rxS = QP_R - 190;
-            T('For PATHAK INDUSTRIES KOL', rxS, y + 10, 7.8, { bold: true, color: C.navy });
+            T(fitText('For ' + SL.name, 7.8, 190), rxS, y + 10, 7.8, { bold: true, color: C.navy });
             LINE(rxS, QP_R, y + 30, C.grey, 0.6);
             T('Authorised Signatory', rxS, y + 40, 7.8, { color: C.grey });
             y += 60;
@@ -7594,12 +7890,12 @@ async function generateQuotePdf() {
             startPage('Quotation', 'Quotation', machineLabel + (v.cap ? ' · ' + v.cap : ''));
             const mini = t => { T(t.toUpperCase(), QP_L, y + 7, 6.8, { bold: true, color: C.red }); y += 11; };
             y = 128;
-            const fromAddr = QP_SELLER.addr + '\n' + QP_SELLER.contact;
-            const cw = 237.5, ch = Math.max(cardHeight(v.customer, v.addr), cardHeight(QP_SELLER.name, fromAddr));
+            const fromAddr = SL.addr + '\n' + SL.contact;
+            const cw = 237.5, ch = Math.max(cardHeight(v.customer, v.addr), cardHeight(SL.name, fromAddr));
             drawCard(QP_L, y, cw, ch, 'QUOTATION TO', 'Buyer', C.red, C.red, v.customer.toUpperCase(), v.addr,
                 'GSTIN ' + (v.gstin || '—'), 'State ' + (v.stateName ? v.stateName + ' (' + v.stateCode + ')' : '—'));
-            drawCard(QP_L + cw + 10, y, cw, ch, 'FROM', 'Seller', C.navy, C.navy, QP_SELLER.name, fromAddr,
-                'GSTIN ' + QP_SELLER.gstin, 'State West Bengal (19)');
+            drawCard(QP_L + cw + 10, y, cw, ch, 'FROM', 'Seller', C.navy, C.navy, SL.name, fromAddr,
+                'GSTIN ' + SL.gstin, 'State ' + SL.stateName + ' (' + SL.stateCode + ')');
             y += ch + 5;
             T(fitText((v.ref ? 'Your ref: ' + v.ref + '   ·   ' : '') + 'Quotation no.: ' + v.quoteNo + '   ·   Date: ' + qpDMY(v.date) + '   ·   Valid until: ' + qpDMY(v.validUntil), 7.2, QP_R - QP_L), QP_L, y + 7, 7.2, { color: C.grey });
             y += 13;
@@ -7675,14 +7971,14 @@ async function generateQuotePdf() {
             }
             y += 6;
             R(QP_L, y, QP_R, y + 28, C.navy);
-            const bank = QP_SELLER.bank;
+            const bank = SL.bank;
             [[bank[0], 8, 62, 11], [bank[1], 290, 340, 11], [bank[2], 8, 62, 22], [bank[3], 290, 340, 22]].forEach(([b, lx, vx, ty], i) => {
                 T(b[0], QP_L + lx, y + ty, 6.8, { color: C.dim });
                 T(b[1], QP_L + vx, y + ty, 7.2, { bold: i !== 2, color: C.white });
             });
             y += 28 + 6;
             const rxS = QP_R - 190;
-            T('For PATHAK INDUSTRIES KOL', rxS, y + 8, 7.4, { bold: true, color: C.navy });
+            T(fitText('For ' + SL.name, 7.4, 190), rxS, y + 8, 7.4, { bold: true, color: C.navy });
             LINE(QP_L, QP_L + 190, y + 24, C.grey, 0.6); LINE(rxS, QP_R, y + 24, C.grey, 0.6);
             T('Customer acceptance (signature & seal)', QP_L, y + 32, 7, { color: C.grey });
             T('Authorised Signatory', rxS, y + 32, 7, { color: C.grey });
@@ -7722,11 +8018,25 @@ async function generateQuotePdf() {
         a.click();
         a.remove();
 
-        // Bump the day's counter only after a successful build
-        const seqKey = 'tlp_qp_seq_' + v.base;
-        localStorage.setItem(seqKey, String((parseInt(localStorage.getItem(seqKey) || '0', 10)) + 1));
+        let registerNote = '';
+        if (numberedCentrally) {
+            // Save to the quote register (Google Sheet) and keep the PDF in Google Drive
+            st.textContent = 'Saving to the quote register…';
+            let b64 = ''; const u8 = new Uint8Array(bytes);
+            for (let i = 0; i < u8.length; i += 0x8000) b64 += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+            const sv = await tlpApi({ action: 'quote_save', filename: fname, pdf_base64: btoa(b64), quote: {
+                quote_no: v.quoteNo, date: v.date, valid_until: v.validUntil, company_id: SL.id, company_name: SL.name,
+                customer: v.customer, contact: v.contact, customer_state: v.stateName, customer_gstin: v.gstin,
+                machine: machineLabel, qty: v.qtyN, amount: Math.round(v.sub * 100) / 100, grand_total: Math.round(v.grand * 100) / 100, design: D.label } });
+            registerNote = sv.error ? ' Note: it was NOT saved to the quote register (' + sv.error.message + ').' : ' Saved to the quote register.';
+            if (!sv.error && typeof tlpQuotesChanged === 'function') tlpQuotesChanged();
+        } else {
+            // Offline fallback: bump this browser's counter only after a successful build
+            const seqKey = 'tlp_qp_seq_' + v.base;
+            localStorage.setItem(seqKey, String((parseInt(localStorage.getItem(seqKey) || '0', 10)) + 1));
+        }
         qpRefreshNo();
-        st.textContent = 'Done: ' + fname + ' (' + out.getPageCount() + ' pages). Grand total Rs. ' + qpMoney(v.grand) + '.' + pictureNote;
+        st.textContent = 'Done: ' + fname + ' (' + out.getPageCount() + ' pages). Grand total Rs. ' + qpMoney(v.grand) + '.' + pictureNote + registerNote;
         if (typeof showNotification === 'function') showNotification('Quotation PDF created.', 'success');
     } catch (err) {
         console.error(err);
