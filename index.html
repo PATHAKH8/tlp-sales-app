@@ -7975,7 +7975,9 @@ async function generateQuotePdf() {
                     if (it.img) { const fs = Math.min((bs - 4) / it.img.width, (bs - 4) / it.img.height), iw = it.img.width * fs, ih = it.img.height * fs; page.drawImage(it.img, { x: bx + (bs - iw) / 2, y: H - (by + bs) + (bs - ih) / 2, width: iw, height: ih }); }
                     const tx = bx + bs + 7, tw = cx[2] - tx - 4;
                     T(fitText(it.desc, 8.2, tw), tx, y + 14, 8.2, { bold: true, color: C.navy });
-                    const dl = WR(String(it.fullDesc || '').replace(/\s*\n\s*/g, ' '), 6.8, tw);
+                    const paras = String(it.fullDesc || '').split(/\n+/).map(x => x.trim()).filter(Boolean);
+                    if (paras.length > 1 && /^Manufactured by TL Pathak/i.test(paras[0])) paras.shift();   // skip the company line that every product shares
+                    const dl = WR(paras.join(' '), 6.8, tw);
                     dl.slice(0, 3).forEach((ln, k) => T(k === 2 && dl.length > 3 ? fitText(ln, 6.8, tw - W(' ...', 6.8)) + ' ...' : ln, tx, y + 24 + k * 8.4, 6.8, { color: C.grey }));
                 } else T(fitText(it.desc, 7.8, cols[1] - 10), cx[1] + 5, mid, 7.8);
                 LINE(QP_L, QP_R, y + rh, C.line, 0.6);
