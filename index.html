@@ -293,6 +293,9 @@
                     <button id="nav-leads" onclick="showTab('leads')" class="w-full flex items-center px-4 py-3.5 text-sm font-medium rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition duration-150 min-h-[44px]">
                         <i data-lucide="scan-line" class="mr-3 h-5 w-5"></i> Scan card / notes
                     </button>
+                    <button id="nav-clients" onclick="showTab('clients')" class="w-full flex items-center px-4 py-3.5 text-sm font-medium rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition duration-150 min-h-[44px]">
+                        <i data-lucide="users" class="mr-3 h-5 w-5"></i> Clients
+                    </button>
                     <button id="nav-admin" onclick="showTab('admin')" class="w-full flex items-center px-4 py-3.5 text-sm font-medium rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition duration-150 hidden min-h-[44px]">
                         <i data-lucide="settings-2" class="mr-3 h-5 w-5"></i> Admin
                     </button>
@@ -495,6 +498,26 @@
                         <div class="flex gap-2"><input id="leads-search" type="search" placeholder="Search leads" oninput="tlpRenderLeads()" class="border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white"><button type="button" onclick="tlpExportLeads()" class="rounded-lg px-3 py-2 text-xs font-bold bg-white border border-slate-300 text-slate-800">Export Excel</button></div>
                     </div>
                     <div id="leads-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+                </section>
+
+                <!-- Clients -->
+                <section id="tab-clients" class="hidden space-y-4 max-w-6xl mx-auto">
+                    <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div><h2 class="text-base sm:text-lg font-extrabold text-slate-900">Clients</h2><p class="text-xs text-slate-500 mt-1">Saved in your Google Drive, in the "Clients" tab of the Google Sheet "TL Pathak App Data". <span id="clients-count" class="font-semibold text-slate-700"></span></p></div>
+                            <div class="flex gap-2"><button type="button" onclick="tlpClientEdit={};tlpRenderClients();document.getElementById('client-form').scrollIntoView({block:'center'})" class="rounded-lg px-3 py-2 text-xs font-bold bg-blue-600 text-white">+ Add client</button><button type="button" onclick="tlpExportClientsFiltered()" class="rounded-lg px-3 py-2 text-xs font-bold bg-white border border-slate-300 text-slate-800">Export Excel</button></div>
+                        </div>
+                        <div class="grid grid-cols-2 lg:grid-cols-6 gap-2 text-xs">
+                            <input id="cl-search" type="search" placeholder="Search name, phone, GSTIN…" oninput="tlpRenderClients()" class="col-span-2 border border-slate-300 rounded-lg px-3 py-2 bg-white">
+                            <select id="cl-state" onchange="tlpRenderClients()" class="border border-slate-300 rounded-lg px-2 py-2 bg-white"></select>
+                            <input id="cl-city" type="search" placeholder="City" oninput="tlpRenderClients()" class="border border-slate-300 rounded-lg px-3 py-2 bg-white">
+                            <select id="cl-source" onchange="tlpRenderClients()" class="border border-slate-300 rounded-lg px-2 py-2 bg-white"></select>
+                            <select id="cl-by" onchange="tlpRenderClients()" class="border border-slate-300 rounded-lg px-2 py-2 bg-white"></select>
+                            <select id="cl-has" onchange="tlpRenderClients()" class="border border-slate-300 rounded-lg px-2 py-2 bg-white"><option value="">Any details</option><option value="gstin">With GSTIN</option><option value="nogstin">Without GSTIN</option><option value="phone">With phone</option><option value="email">With email</option></select>
+                        </div>
+                    </div>
+                    <div id="client-form"></div>
+                    <div id="clients-list"></div>
                 </section>
 
                 <!-- Tab: Admin Panel -->
@@ -1059,7 +1082,7 @@
         function showTab(tabId) {
             activeTab = tabId;
             
-            ['dashboard', 'finder', 'leads', 'admin'].forEach(tab => {
+            ['dashboard', 'finder', 'leads', 'clients', 'admin'].forEach(tab => {
                 const element = document.getElementById(`tab-${tab}`);
                 const navBtn = document.getElementById(`nav-${tab}`);
                 if (element) element.classList.add('hidden');
@@ -1079,7 +1102,7 @@
 
             const titleEl = document.getElementById('current-tab-title');
             if (titleEl) {
-                titleEl.innerText = tabId === 'dashboard' ? 'Products' : tabId === 'finder' ? 'Smart Product Finder' : tabId === 'leads' ? 'Scan card / notes' : 'Admin';
+                titleEl.innerText = tabId === 'dashboard' ? 'Products' : tabId === 'finder' ? 'Smart Product Finder' : tabId === 'leads' ? 'Scan card / notes' : tabId === 'clients' ? 'Clients' : 'Admin';
             }
             document.getElementById('top-search-bar').classList.toggle('hidden', tabId !== 'dashboard');
 
@@ -5006,9 +5029,10 @@ async function clickSyncButton() {
                 <div class="flex items-center justify-between gap-2 flex-wrap"><div><span class="font-bold text-slate-900">${tlpE(u.full_name || u.email)}</span> <span class="text-slate-500">${tlpE(u.email)}</span>${u.approved === true ? '' : ' <span class="ml-1 text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Waiting for approval</span>'}</div>
                     <div class="flex items-center gap-2"><select class="${TLP_IN}" style="width:auto" onchange="tlpSetUser('${u.id}','role',this.value)" ${String(u.id) === String(currentUser.id) ? 'disabled' : ''}><option value="sales" ${u.role !== 'admin' ? 'selected' : ''}>Sales</option><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Administrator</option></select>
                     <select class="${TLP_IN}" style="width:auto" onchange="tlpSetUser('${u.id}','company_id',this.value)">${coOpts(u.company_id)}</select></div></div>
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">${chk(u, 'approved', 'Approved')}${chk(u, 'can_view_cost', 'Purchase rates')}${chk(u, 'can_edit_prices', 'Edit prices')}${chk(u, 'can_see_all_quotes', "Everyone's quotes")}
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">${chk(u, 'approved', 'Approved')}${chk(u, 'can_view_cost', 'Purchase rates')}${chk(u, 'can_edit_prices', 'Edit prices')}${chk(u, 'can_see_all_quotes', "Everyone's quotes and leads")}
                     <span class="flex items-center gap-1.5 ml-auto"><input id="pw-${u.id}" class="${TLP_IN}" style="width:150px" type="text" placeholder="New password"><button type="button" onclick="tlpResetPassword('${u.id}')" class="${TLP_BTN} bg-white border border-slate-300 text-slate-700">Set password</button>
                     ${String(u.id) === String(currentUser.id) ? '' : `<button type="button" onclick="tlpRemoveUser('${u.id}')" class="${TLP_BTN} text-rose-600">Remove</button>`}</span></div>
+                ${tlpAccessRow(u)}
             </div>`).join('') || '<p class="text-xs text-slate-500">No users yet.</p>'}</div>
         </div>`;
     }
@@ -5076,7 +5100,7 @@ async function clickSyncButton() {
             <td class="py-2 pr-3"><select class="${TLP_IN}" style="width:auto" onchange="tlpSetQuote('${q.id}','status',this.value)">${TLP_STATUSES.map(x => `<option ${q.status === x ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
             <td class="py-2 pr-3"><input type="date" class="${TLP_IN} ${q.follow_up && String(q.follow_up).slice(0, 10) <= today && q.status !== 'Won' && q.status !== 'Lost' ? 'border-rose-400 bg-rose-50' : ''}" style="width:auto" value="${tlpE(String(q.follow_up || '').slice(0, 10))}" onchange="tlpSetQuote('${q.id}','follow_up',this.value)"></td>
             <td class="py-2 pr-3"><input class="${TLP_IN}" style="min-width:150px" value="${tlpE(q.notes || '')}" placeholder="Add a note" onchange="tlpSetQuote('${q.id}','notes',this.value)"></td>
-            <td class="py-2 whitespace-nowrap text-right">${q.pdf_url ? `<a href="${tlpE(q.pdf_url)}" target="_blank" rel="noopener" class="text-blue-700 font-bold mr-3">PDF</a>` : ''}<button type="button" class="text-slate-700 font-bold mr-3" onclick="tlpCopyQuote('${q.id}')">Copy</button><button type="button" class="text-emerald-700 font-bold" onclick="tlpQuoteWhatsApp('${q.id}')">WhatsApp</button></td></tr>`).join('')}</tbody></table>`
+            <td class="py-2 whitespace-nowrap text-right">${q.pdf_url ? `<a href="${tlpE(q.pdf_url)}" target="_blank" rel="noopener" class="text-blue-700 font-bold mr-3">PDF</a>` : ''}${q.form_json && (tlpIsAdmin() || String(q.created_by) === String(currentUser.id)) ? `<button type="button" class="text-blue-700 font-bold mr-3" onclick="tlpEditQuote('${q.id}')">Edit</button>` : ''}<button type="button" class="text-slate-700 font-bold mr-3" onclick="tlpCopyQuote('${q.id}')">Copy</button><button type="button" class="text-emerald-700 font-bold" onclick="tlpQuoteWhatsApp('${q.id}')">WhatsApp</button></td></tr>`).join('')}</tbody></table>`
             : '<p class="text-xs text-slate-500 py-8 text-center">No quotations found. Quotes appear here automatically when they are created.</p>';
     }
 
@@ -5567,8 +5591,9 @@ async function clickSyncButton() {
             catch (e) { tlpRenderScanForm({}, 'The text could not be read automatically (' + e.message + '). The picture is kept: please type the details.'); return; }
             if (!tlpScan) return;
             tlpScan.text = text;
-            if (kind === 'card') tlpRenderScanForm(tlpParseCard(text), text.trim() ? 'Text read from the card. Please check each box and correct anything that is wrong before saving.' : 'No text could be read. The picture is kept: please type the details.');
-            else tlpRenderScanForm({ requirement: text.trim(), items_text: tlpParseNoteItems(text) }, 'Handwriting is read only roughly, so please correct the text below against the picture. The picture is saved with the lead.');
+            const how = tlpLastReader === 'google' ? "Read with Google's text reader. " : 'Read on this device. ';
+            if (kind === 'card') tlpRenderScanForm(tlpParseCard(text), text.trim() ? how + 'Please check each box and correct anything that is wrong before saving.' : 'No text could be read. The picture is kept: please type the details.');
+            else { const c = tlpParseCard(text); tlpRenderScanForm({ phone: c.phone, email: c.email, gstin: c.gstin, requirement: text.trim(), items_text: tlpParseNoteItems(text) }, text.trim() ? how + (tlpLastReader === 'google' ? 'Check the text below against the picture and correct it. The picture is saved with the lead.' : 'Handwriting is read only roughly on the device, so please correct the text below against the picture.') : 'No text could be read. The picture is kept: please type the note.'); }
         } catch (e) { box.innerHTML = ''; showNotification(e.message, 'error'); }
     }
     function tlpScanManual(kind) { tlpScan = { kind, img: '', text: '' }; tlpRenderScanForm({}, kind === 'card' ? 'Type the contact details.' : 'Type the client and what was discussed.'); }
@@ -5682,6 +5707,7 @@ async function clickSyncButton() {
         }
         tlpLoadClients().then(() => { tlpFillClientList(); tlpRenderClientsCard(); });
         tlpLoadLeads().then(tlpRenderLeads);
+        tlpApplyAccess();
     }
     const tlpInstallCrmBase = tlpInstallCrmUi;
     tlpInstallCrmUi = function () { tlpInstallCrmBase(); tlpInstallSalesUi(); };
@@ -5724,6 +5750,191 @@ async function clickSyncButton() {
         tlpCloseMap(); showNotification('Mapping saved. Syncing the products…', 'success');
         saveSyncedSheetEdits(tlpMapState.index);
     }
+    // =====================================================================================================
+    // Quote "made by", remembered settings, editing a saved quotation, clients screen, access to parts, text reader
+    // =====================================================================================================
+    let tlpProfile = null, tlpTeamList = [], tlpPrefs = {};
+    const TLP_PARTS = [['finder', 'Product finder'], ['quotes', 'Quotations'], ['leads', 'Scan card / notes'], ['clients', 'Clients']];
+    // Which parts this login may open. A blank list means all of them; administrators always see everything.
+    function tlpCan(part) {
+        if (!currentUser) return false;
+        if (currentUser.role === 'admin') return true;
+        const a = String((tlpProfile && tlpProfile.access) || '').trim();
+        return !a || a.split(',').map(x => x.trim()).indexOf(part) !== -1;
+    }
+    function tlpApplyAccess() {
+        const show = (id, ok) => { const el = document.getElementById(id); if (el) el.style.display = ok ? '' : 'none'; };
+        show('nav-finder', tlpCan('finder')); show('nav-leads', tlpCan('leads')); show('nav-clients', tlpCan('clients'));
+        show('nav-newquote', tlpCan('quotes')); show('nav-quotes', tlpCan('quotes')); show('tlp-quotes-bar', tlpCan('quotes'));
+        document.querySelectorAll('#mobile-bottom-nav button[data-tab]').forEach(b => { const t = b.dataset.tab; if (t === 'finder' || t === 'leads' || t === 'clients') b.style.display = tlpCan(t) ? '' : 'none'; });
+    }
+    const tlpShowTabBase = showTab;
+    showTab = function (tabId) {
+        if ((tabId === 'finder' || tabId === 'leads' || tabId === 'clients') && !tlpCan(tabId)) { showNotification('Your login does not have access to this part. Ask the administrator.', 'error'); return; }
+        tlpShowTabBase(tabId);
+        if (tabId === 'clients') tlpRenderClients();
+    };
+    function tlpSetAccess(id, part, on) {
+        const u = tlpTeam.find(x => String(x.id) === String(id)); if (!u) return;
+        const cur = String(u.access || '').trim(), all = TLP_PARTS.map(p => p[0]);
+        let list = !cur ? all.slice() : cur.split(',').map(x => x.trim()).filter(x => all.indexOf(x) !== -1);
+        list = on ? [...new Set(list.concat(part))] : list.filter(x => x !== part);
+        tlpSetUser(id, 'access', list.length === all.length ? '' : (list.join(',') || 'none'));
+    }
+    function tlpAccessRow(u) {
+        const cur = String(u.access || '').trim(), has = p => u.role === 'admin' || !cur || cur.split(',').map(x => x.trim()).indexOf(p) !== -1;
+        return `<div class="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t border-slate-100"><span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Can open</span>
+            ${TLP_PARTS.map(([p, label]) => `<label class="flex items-center gap-1.5 whitespace-nowrap"><input type="checkbox" ${has(p) ? 'checked' : ''} ${u.role === 'admin' ? 'disabled' : ''} onchange="tlpSetAccess('${u.id}','${p}',this.checked)"> ${label}</label>`).join('')}
+            <span class="flex items-center gap-1.5 ml-auto"><span class="text-slate-500">Phone on quotes</span><input class="${TLP_IN}" style="width:160px" type="tel" value="${tlpE(u.phone === null || u.phone === undefined ? '' : u.phone)}" placeholder="+91 ..." onchange="tlpSetUser('${u.id}','phone',this.value.trim())"></span></div>`;
+    }
+
+    // ---------- Quote made by + settings remembered for the next quotation ----------
+    async function tlpLoadTeamList() { const r = await tlpApi({ action: 'team_list' }); if (!r.error) tlpTeamList = (r.data || []).sort((a, b) => String(a.full_name).localeCompare(String(b.full_name))); return tlpTeamList; }
+    const tlpPrefsKey = () => 'tlp_quote_prefs_' + (currentUser ? currentUser.id : '');
+    function tlpLoadPrefs() {
+        let server = {}, local = {};
+        try { server = JSON.parse((tlpProfile && tlpProfile.prefs) || '{}') || {}; } catch (e) {}
+        try { local = JSON.parse(localStorage.getItem(tlpPrefsKey()) || '{}') || {}; } catch (e) {}
+        tlpPrefs = (local.at || 0) > (server.at || 0) ? local : Object.assign({}, local, server);
+    }
+    function tlpMadeByChanged() {
+        const sel = document.getElementById('qp-madeby'), o = sel.selectedOptions[0]; if (!o) return;
+        document.getElementById('qp-madeby-phone').value = o.dataset.phone || '';
+        document.getElementById('qp-madeby-email').value = o.dataset.email || '';
+    }
+    function tlpPrepareQuoteForm() {
+        const sel = document.getElementById('qp-madeby'); if (!sel || !currentUser) return;
+        const keep = sel.value;
+        let list = tlpTeamList.slice();
+        if (!list.some(u => String(u.id) === String(currentUser.id))) list.unshift({ id: currentUser.id, full_name: currentUser.name || currentUser.full_name || (tlpProfile && tlpProfile.full_name) || '', email: currentUser.email || (tlpProfile && tlpProfile.email) || '', phone: (tlpProfile && tlpProfile.phone) || '' });
+        sel.innerHTML = list.map(u => `<option value="${tlpE(u.id)}" data-name="${tlpE(u.full_name || u.email)}" data-phone="${tlpE(u.phone === null || u.phone === undefined ? '' : u.phone)}" data-email="${tlpE(u.email)}">${tlpE(u.full_name || u.email)}${String(u.id) === String(currentUser.id) ? ' (me)' : ''}</option>`).join('')
+            + '<option value="" data-name="" data-phone="" data-email="">Do not print a contact person</option>';
+        const before0 = sel.dataset.filled === '1';
+        const want = (before0 ? [keep] : []).concat([tlpPrefs.madeby, currentUser.id]).find(v => v !== undefined && v !== null && [...sel.options].some(o => o.value === String(v)));
+        const before = sel.dataset.filled === '1';
+        sel.value = want === undefined ? String(currentUser.id) : String(want);
+        if (!before || (!document.getElementById('qp-madeby-phone').value && !document.getElementById('qp-madeby-email').value)) tlpMadeByChanged();
+        sel.dataset.filled = '1';
+        tlpApplyQuotePrefs(false);
+    }
+    // force = a new blank quote: put the remembered choices back; otherwise only fill what is still empty
+    function tlpApplyQuotePrefs(force) {
+        const P = tlpPrefs || {}, set = (id, v, always) => { const el = document.getElementById(id); if (!el || v === undefined || v === null || v === '') return; if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === String(v))) return; if (always || force || !el.value) el.value = v; };
+        const first = !document.getElementById('quotepdf-modal').dataset.prefsApplied;
+        set('qp-company', P.company, first); set('qp-design', P.design, false); set('qp-layout', P.layout, first); set('qp-gst-rate', P.gstRate, false); set('qp-valid', P.valid, first);
+        if (P.terms && (force || first) ) { const t = document.getElementById('qp-terms'); if (t && (force || !t.value.trim() || t.value === QP_DEFAULT_TERMS)) t.value = P.terms; }
+        if (force && P.madeby !== undefined) { const s = document.getElementById('qp-madeby'); if (s && [...s.options].some(o => o.value === String(P.madeby))) { s.value = String(P.madeby); tlpMadeByChanged(); } }
+        document.getElementById('quotepdf-modal').dataset.prefsApplied = '1';
+    }
+    function tlpAfterQuote() {
+        const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+        tlpPrefs = { company: g('qp-company'), design: g('qp-design'), layout: g('qp-layout'), gstRate: g('qp-gst-rate'), valid: g('qp-valid'), terms: g('qp-terms'), madeby: g('qp-madeby'), at: Date.now() };
+        try { localStorage.setItem(tlpPrefsKey(), JSON.stringify(tlpPrefs)); } catch (e) {}
+        const body = { action: 'me_update', prefs: JSON.stringify(tlpPrefs) };
+        // the phone typed for yourself is kept on your profile, so it is there next time and for your colleagues
+        if (String(g('qp-madeby')) === String(currentUser.id) && g('qp-madeby-phone').trim() !== String((tlpProfile && tlpProfile.phone) || '')) body.phone = g('qp-madeby-phone').trim();
+        tlpApi(body).then(r => { if (!r.error && r.data) { tlpProfile = Object.assign(tlpProfile || {}, { prefs: r.data.prefs, phone: r.data.phone }); if (body.phone !== undefined) tlpLoadTeamList(); } }).catch(() => {});
+    }
+
+    // ---------- Edit a saved quotation (same number, the PDF in Drive is replaced) ----------
+    function tlpEditQuote(id) {
+        const q = tlpQuotes.find(x => String(x.id) === String(id)); if (!q) return;
+        let snap = null; try { snap = q.form_json ? JSON.parse(q.form_json) : null; } catch (e) {}
+        if (!snap) return showNotification('This quotation was made before editing was added, so it cannot be opened for editing. Use Copy to make a new one from it.', 'info');
+        if (currentUser.role !== 'admin' && String(q.created_by) !== String(currentUser.id)) return showNotification('Only the person who made this quotation, or an administrator, can edit it.', 'error');
+        closeQuotesRegister();
+        qpLoadSnapshot(snap, true);
+        const m = document.getElementById('quotepdf-modal'); m.dataset.editId = q.id; m.dataset.editNo = q.quote_no;
+        qpRefreshNo();
+        document.getElementById('qp-mode').textContent = 'Editing ' + q.quote_no + ': change what is needed and press Generate. The number stays the same and the saved PDF is replaced.';
+    }
+
+    // ---------- Clients screen ----------
+    let tlpClientEdit = null;
+    function tlpClientFilters() {
+        const g = id => (document.getElementById(id)?.value || '').trim();
+        const s = g('cl-search').toLowerCase(), st = g('cl-state'), src = g('cl-source'), by = g('cl-by'), city = g('cl-city').toLowerCase(), has = g('cl-has');
+        return tlpClients.filter(c => (!s || [c.name, c.contact, c.phone, c.email, c.gstin, c.address, c.city, c.notes].join(' ').toLowerCase().includes(s))
+            && (!st || String(c.state_code || '').padStart(2, '0') === st) && (!src || String(c.source || '').indexOf(src) === 0) && (!by || String(c.created_by_name || '') === by)
+            && (!city || String(c.city || c.address || '').toLowerCase().includes(city))
+            && (!has || (has === 'gstin' ? !!c.gstin : has === 'nogstin' ? !c.gstin : has === 'phone' ? !!c.phone : has === 'email' ? !!c.email : true)));
+    }
+    function tlpRenderClients() {
+        const box = document.getElementById('clients-list'); if (!box) return;
+        const opt = (id, values, label) => { const el = document.getElementById(id); if (!el) return; const keep = el.value; el.innerHTML = `<option value="">${label}</option>` + values.map(([v, t]) => `<option value="${tlpE(v)}">${tlpE(t)}</option>`).join(''); el.value = keep; };
+        const uniq = f => [...new Set(tlpClients.map(f).filter(Boolean))].sort();
+        opt('cl-state', uniq(c => String(c.state_code || '').padStart(2, '0')).filter(k => TLP_GST_STATES[k]).map(k => [k, TLP_GST_STATES[k]]), 'All states');
+        opt('cl-source', uniq(c => String(c.source || '').split(' - ')[0]).map(v => [v, v]), 'All sources');
+        opt('cl-by', uniq(c => String(c.created_by_name || '')).map(v => [v, v]), 'Added by anyone');
+        const rows = tlpClientFilters();
+        document.getElementById('clients-count').textContent = rows.length + ' of ' + tlpClients.length + ' clients';
+        const form = tlpClientEdit ? tlpClientForm(tlpClientEdit) : '';
+        document.getElementById('client-form').innerHTML = form;
+        box.innerHTML = rows.length ? `<div class="overflow-x-auto bg-white border border-slate-200 rounded-2xl"><table class="w-full text-xs text-left"><thead><tr class="text-slate-500 border-b border-slate-200"><th class="p-2.5">Client</th><th class="p-2.5">Contact</th><th class="p-2.5">Phone / email</th><th class="p-2.5">Place</th><th class="p-2.5">GSTIN</th><th class="p-2.5">Source</th><th class="p-2.5"></th></tr></thead><tbody>${rows.slice(0, 300).map(c => {
+            const tel = String(c.phone || '').split(',')[0].replace(/[^\d+]/g, ''), wa = tel.replace(/\D/g, '').replace(/^0/, ''), g = tlpGstin(c.gstin), code = String(c.state_code || (g.ok ? g.stateCode : '')).padStart(2, '0');
+            return `<tr class="border-b border-slate-100 align-top"><td class="p-2.5 font-semibold text-slate-900">${tlpE(c.name)}</td><td class="p-2.5">${tlpE(c.contact || '')}</td><td class="p-2.5">${tlpE(c.phone || '')}${c.email ? '<br><span class="text-slate-500">' + tlpE(c.email) + '</span>' : ''}</td>
+                <td class="p-2.5">${tlpE([c.city, TLP_GST_STATES[code]].filter(Boolean).join(', '))}</td><td class="p-2.5">${tlpE(c.gstin || '')}</td><td class="p-2.5 text-slate-500">${tlpE(c.source || '')}${c.created_by_name ? '<br>' + tlpE(c.created_by_name) : ''}</td>
+                <td class="p-2.5 whitespace-nowrap text-right font-bold">${tlpCan('quotes') ? `<button type="button" class="text-blue-700 mr-3" onclick="tlpClientQuote('${c.id}')">Quote</button>` : ''}${tel ? `<a class="text-emerald-700 mr-3" target="_blank" rel="noopener" href="https://wa.me/${wa.length === 10 ? '91' + wa : wa}">WhatsApp</a>` : ''}<button type="button" class="text-slate-700 mr-3" onclick="tlpClientEdit=tlpClients.find(x=>String(x.id)==='${c.id}');tlpRenderClients();document.getElementById('client-form').scrollIntoView({block:'center'})">Edit</button>${currentUser.role === 'admin' ? `<button type="button" class="text-rose-600" onclick="tlpDeleteClient('${c.id}')">Delete</button>` : ''}</td></tr>`;
+        }).join('')}</tbody></table></div>${rows.length > 300 ? '<p class="text-[11px] text-slate-500 mt-2">Showing the first 300. Use the filters or the search to narrow the list; Export gives all of them.</p>' : ''}`
+            : `<p class="text-xs text-slate-500 py-8 text-center">${tlpClients.length ? 'No client matches these filters.' : 'No clients yet. They are added automatically from every quotation and scanned card, or the administrator can import your old list.'}</p>`;
+    }
+    function tlpClientForm(c) {
+        const f = (id, label, val, span) => `<div class="${span || ''}"><label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">${label}</label><input id="cf-${id}" class="${TLP_IN}" value="${tlpE(val === null || val === undefined ? '' : val)}"></div>`;
+        return `<div class="bg-white border border-blue-200 rounded-2xl p-4 space-y-3"><p class="text-sm font-bold text-slate-900">${c.id ? 'Edit client' : 'Add a client'}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">${f('name', 'Company / client name *', c.name, 'sm:col-span-2')}${f('contact', 'Contact person', c.contact)}${f('phone', 'Phone / WhatsApp', c.phone)}${f('email', 'Email', c.email)}${f('gstin', 'GSTIN', c.gstin)}${f('city', 'City', c.city)}
+                <div><label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">State</label><select id="cf-state" class="${TLP_IN}"><option value="">—</option>${Object.keys(TLP_GST_STATES).sort().map(k => `<option value="${k}" ${String(c.state_code || '').padStart(2, '0') === k ? 'selected' : ''}>${k} ${tlpE(TLP_GST_STATES[k])}</option>`).join('')}<option value="EX" ${c.state_code === 'EX' ? 'selected' : ''}>Outside India</option></select></div>
+                ${f('address', 'Address', c.address, 'sm:col-span-2')}${f('notes', 'Notes (products of interest, remarks)', c.notes, 'sm:col-span-2')}</div>
+            <div class="flex justify-end gap-2"><button type="button" class="${TLP_BTN} bg-white border border-slate-300" onclick="tlpClientEdit=null;tlpRenderClients()">Cancel</button><button type="button" class="${TLP_BTN} bg-blue-600 text-white" onclick="tlpSaveClient(this)">Save client</button></div></div>`;
+    }
+    async function tlpSaveClient(btn) {
+        const g = id => (document.getElementById('cf-' + id).value || '').trim(), gs = tlpGstin(g('gstin'));
+        if (!g('name')) return showNotification('Enter the client name.', 'error');
+        if (gs.gstin && !gs.ok) return showNotification('GSTIN: ' + gs.why, 'error');
+        const row = { name: g('name'), contact: g('contact'), phone: g('phone'), email: g('email'), gstin: gs.gstin, city: g('city'), state_code: document.getElementById('cf-state').value || (gs.ok ? gs.stateCode : ''), address: g('address'), notes: g('notes'), updated_at: new Date().toISOString() };
+        btn.disabled = true;
+        const r = tlpClientEdit.id ? await dataClient.from('clients').update(row).eq('id', tlpClientEdit.id) : await dataClient.from('clients').insert(Object.assign({ source: 'Added by hand' }, row));
+        if (r.error) { btn.disabled = false; return showNotification('Could not save: ' + r.error.message, 'error'); }
+        tlpClientEdit = null; await tlpLoadClients(); tlpRenderClients(); showNotification('Client saved.', 'success');
+    }
+    async function tlpDeleteClient(id) {
+        const c = tlpClients.find(x => String(x.id) === String(id)); if (!c) return;
+        if (!(await showCustomConfirm('Delete this client?', c.name + ' is removed from the client list. Quotations already made are not affected.'))) return;
+        const r = await dataClient.from('clients').delete().eq('id', id);
+        if (r.error) return showNotification(r.error.message, 'error');
+        await tlpLoadClients(); tlpRenderClients();
+    }
+    function tlpClientQuote(id) { const c = tlpClients.find(x => String(x.id) === String(id)); if (!c) return; qpNewQuote(); tlpFillClient(c); document.getElementById('qp-mode').textContent = 'New quote for ' + c.name + ': add the products.'; }
+    function tlpExportClientsFiltered() {
+        const rows = tlpClientFilters().map(c => ({ Name: c.name, Contact: c.contact, Phone: c.phone, Email: c.email, Address: c.address, City: c.city, State: TLP_GST_STATES[String(c.state_code || '').padStart(2, '0')] || c.state_code, GSTIN: c.gstin, Notes: c.notes, Source: c.source, 'Added by': c.created_by_name, 'Added on': String(c.created_at || '').slice(0, 10) }));
+        if (!rows.length) return showNotification('No clients to export.', 'info');
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Clients'); XLSX.writeFile(wb, 'TL_Pathak_Clients_' + new Date().toLocaleDateString('en-CA') + '.xlsx');
+    }
+
+    // ---------- Text reader: Google's reader through your own Google account first (good with handwriting), the on-device reader as the fallback ----------
+    let tlpGoogleReader = true, tlpLastReader = '';
+    const tlpReadTextDevice = tlpReadText;
+    tlpReadText = async function (dataUrl, onProgress) {
+        if (tlpGoogleReader && navigator.onLine !== false) {
+            try {
+                if (onProgress) onProgress(30);
+                const r = await tlpApi({ action: 'ocr', image_base64: String(dataUrl).split(',')[1] });
+                if (!r.error) { tlpLastReader = 'google'; return String(r.data.text || ''); }
+                if (/OCR_NOT_ENABLED|Unknown action|not defined/i.test(r.error.message || '')) tlpGoogleReader = false;   // not switched on in the script: use the device reader
+            } catch (e) {}
+        }
+        tlpLastReader = 'device';
+        return tlpReadTextDevice(dataUrl, onProgress);
+    };
+
+    // ---------- Wiring ----------
+    const tlpEnterTeam = enterApplication;
+    enterApplication = async function (profile) {
+        tlpProfile = profile || null;
+        await tlpEnterTeam(profile);
+        tlpLoadPrefs(); tlpApplyAccess();
+        tlpLoadTeamList();
+        setTimeout(tlpApplyAccess, 2500);   // the Quotations buttons are added a moment after sign-in
+    };
     window.addEventListener('load', async function () {
         try {
             const { data: { session }, error: sessionError } = await dataClient.auth.getSession();
@@ -5775,6 +5986,7 @@ async function clickSyncButton() {
       ['dashboard','home','Home',false],
       ['finder','search-check','Finder',false],
       ['leads','scan-line','Scan',false],
+      ['clients','users','Clients',false],
       ['admin','settings-2','Admin',true]
     ];
     nav.innerHTML=items.map(([tab,icon,label,admin])=>`<button type="button" data-tab="${tab}" data-admin="${admin}" onclick="showTab('${tab}')"><i data-lucide="${icon}"></i><span>${label}</span></button>`).join('');
@@ -5853,7 +6065,10 @@ textarea.qp-in{min-height:70px;font-family:ui-monospace,Menlo,Consolas,monospace
                             <option value="detailed">Detailed: separate offer, details and terms pages</option>
                         </select></div>
                     <div><label class="qp-l">&nbsp;</label><label class="flex items-center gap-2 text-xs text-slate-700" style="min-height:40px"><input type="checkbox" id="qp-annex"> Add full details page (complete description on a second page)</label></div>
+                    <div><label class="qp-l" for="qp-madeby">Quote made by (printed as the contact person)</label><select id="qp-madeby" class="qp-in" onchange="tlpMadeByChanged()"></select></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="qp-l" for="qp-madeby-phone">Their phone</label><input id="qp-madeby-phone" class="qp-in" type="tel" placeholder="+91 ..."></div><div><label class="qp-l" for="qp-madeby-email">Their email</label><input id="qp-madeby-email" class="qp-in" type="email"></div></div>
                 </div>
+                <p class="qp-hint">Your choices here (company, template, layout, contact person, GST and terms) are remembered for your next quotation.</p>
             </div>
 
             <div>
@@ -6116,6 +6331,7 @@ function qpRead() {
         customer: g('qp-customer'), attn: g('qp-attn'), addr: addrLines.concat(stateName && !exportCust ? [stateName] : []).join(', '),
         gstin: g('qp-gstin'), stateCode, stateName, ref: g('qp-ref'),
         machine, cap, items, sub, taxes, grand, intra, charges, taxable, gstType, gstRate, totalLines, exportCust,
+        madeBy: { name: (qpEl('qp-madeby') && qpEl('qp-madeby').selectedOptions[0] ? qpEl('qp-madeby').selectedOptions[0].dataset.name || '' : ''), phone: g('qp-madeby-phone'), email: g('qp-madeby-email') },
         phone: g('qp-phone'), email: g('qp-email'), addressRaw: g('qp-address'), annex: !!(qpEl('qp-annex') && qpEl('qp-annex').checked),
         highlights: qpLines('qp-highlights'),
         specs: qpLines('qp-specs'), features: qpLines('qp-features'), note: g('qp-note'),
@@ -6178,6 +6394,8 @@ async function qpLoadImage(urls) {
 function qpRefreshNo() {
     const el = qpEl('qp-no');
     if (!el) return;
+    const ed = qpEl('quotepdf-modal').dataset;
+    if (ed.editId && ed.editNo) { el.value = ed.editNo + '  (editing: the number stays the same)'; return; }
     const base = qpBase(qpEl('qp-date')?.value || qpToday(), qpSellerFor(qpEl('qp-company')?.value).prefix);
     el.value = (typeof tlpApi === 'function' && localStorage.getItem('tlp_session_token')) ? base + '  (final number is issued when the quote is created)' : qpNextNo(base);
 }
@@ -6200,6 +6418,7 @@ function qpRemoveProduct(i) { const x = window.qpExtraProducts.splice(i, 1)[0]; 
 function qpClearProducts() { window.qpExtraProducts.length = 0; if (typeof tlpBasketClear === 'function') tlpBasketClear(); qpRenderProducts(); qpUpdateTotals(); }
 
 function openQuotePdf() {
+    if (typeof tlpCan === 'function' && !tlpCan('quotes')) { showNotification('Your login does not have access to quotations. Ask the administrator.', 'error'); return; }
     const sel = qpEl('qp-design');
     if (sel && sel.options.length <= 1) {
         QP_DESIGNS.forEach(d => sel.add(new Option(d.label, d.id)));
@@ -6217,6 +6436,7 @@ function openQuotePdf() {
     if (qpEl('qp-customer') && !qpEl('qp-customer').value) qpEl('qp-customer').value = qpEl('calc-client-name')?.value || '';
     if (qpEl('qp-date') && !qpEl('qp-date').value) qpEl('qp-date').value = qpToday();
     if (qpEl('qp-terms') && !qpEl('qp-terms').value.trim()) qpEl('qp-terms').value = QP_DEFAULT_TERMS;
+    if (typeof tlpPrepareQuoteForm === 'function') tlpPrepareQuoteForm();
     qpRefreshNo();
     qpRenderProducts(); qpRenderCharges();
     if (typeof tlpFillClientList === 'function') tlpFillClientList();
@@ -6244,7 +6464,9 @@ async function generateQuotePdf() {
         const D = QP_DESIGNS.find(d => d.id === v.design);
         // Quotation number: issued centrally so two people can never get the same one
         let numberedCentrally = false;
-        if (!window.qpPreviewOnly && typeof tlpApi === 'function' && localStorage.getItem('tlp_session_token')) {
+        const editId = qpEl('quotepdf-modal').dataset.editId || '', editNo = qpEl('quotepdf-modal').dataset.editNo || '';
+        if (editId && editNo) { v.quoteNo = editNo; numberedCentrally = !window.qpPreviewOnly; }
+        else if (!window.qpPreviewOnly && typeof tlpApi === 'function' && localStorage.getItem('tlp_session_token')) {
             st.textContent = 'Getting the quotation number…';
             const nr = await tlpApi({ action: 'quote_number', prefix: SL.prefix, date: v.date });
             if (nr.data && nr.data.quote_no) { v.quoteNo = nr.data.quote_no; numberedCentrally = true; }
@@ -6480,6 +6702,7 @@ async function generateQuotePdf() {
         const machineLabel = v.machine || v.items[0].desc;
         const stateText = v.exportCust ? 'Export supply' : 'State ' + (v.stateName ? v.stateName + ' (' + v.stateCode + ')' : '—');
         let onePageCut = 0;
+        const mb = v.madeBy || {}, madeByLine = (mb.name || mb.phone || mb.email) ? '\nContact: ' + [mb.name, mb.phone, mb.email].filter(Boolean).join(' · ') : '';
         const signed = n => (n < 0 ? '- ' : '') + qpMoney(Math.abs(n));
         const totalRows = () => v.totalLines.map(([l, a]) => ({ kind: 'sub', cells: [{ t: '' }, { t: l, span: 4, a: 'r' }, { t: signed(a), a: 'r' }] }))
             .concat([{ kind: 'total', cells: [{ t: '' }, { t: 'GRAND TOTAL', span: 4, a: 'r' }, { t: 'Rs. ' + qpMoney(v.grand), a: 'r' }] }]);
@@ -6531,7 +6754,7 @@ async function generateQuotePdf() {
             startPage('Quotation', 'Commercial Offer', machineLabel + (v.cap ? ' · ' + v.cap : ''));
             section('Quotation');
             const toAddr = [v.addr].filter(Boolean).join('');
-            const fromAddr = SL.addr + '\n' + SL.contact;
+            const fromAddr = SL.addr + '\n' + SL.contact + madeByLine;
             const cw = 237.5, hT = cardHeight(v.customer, toAddr), hF = cardHeight(SL.name, fromAddr);
             const ch = Math.max(hT, hF);
             ensure(ch + 10);
@@ -6643,7 +6866,7 @@ async function generateQuotePdf() {
             startPage('Quotation', 'Quotation', catalogItems.length + ' products');
             const mini = t => { ensure(14); T(t.toUpperCase(), QP_L, y + 7, 6.8, { bold: true, color: C.red }); y += 11; };
             y = 128;
-            const fromAddr = SL.addr + '\n' + SL.contact;
+            const fromAddr = SL.addr + '\n' + SL.contact + madeByLine;
             const cw = 237.5, ch = Math.max(cardHeight(v.customer, v.addr), cardHeight(SL.name, fromAddr));
             drawCard(QP_L, y, cw, ch, 'QUOTATION TO', 'Buyer', C.red, C.red, v.customer.toUpperCase(), v.addr,
                 'GSTIN ' + (v.gstin || '—'), stateText);
@@ -6736,7 +6959,7 @@ async function generateQuotePdf() {
             startPage('Quotation', 'Quotation', machineLabel + (v.cap ? ' · ' + v.cap : ''));
             const mini = t => { T(t.toUpperCase(), QP_L, y + 7, 6.8, { bold: true, color: C.red }); y += 11; };
             y = 128;
-            const fromAddr = SL.addr + '\n' + SL.contact;
+            const fromAddr = SL.addr + '\n' + SL.contact + madeByLine;
             const cw = 237.5, ch = Math.max(cardHeight(v.customer, v.addr), cardHeight(SL.name, fromAddr));
             drawCard(QP_L, y, cw, ch, 'QUOTATION TO', 'Buyer', C.red, C.red, v.customer.toUpperCase(), v.addr,
                 'GSTIN ' + (v.gstin || '—'), stateText);
@@ -6757,8 +6980,8 @@ async function generateQuotePdf() {
                 { t: it.hsn, a: 'c' }, { t: it.qtyText, a: 'c' },
                 { t: qpMoney(it.rate), a: 'r' }, { t: qpMoney(it.q * it.rate), a: 'r' }
             ] })).concat(totalRows());
-            const PW = [28, 200, 50, 55, 75, 77], picW = 150, TAIL = 6 + 28 + 6 + 36, lw = 84, tw = QP_R - QP_L - lw, FULL = QP_R - QP_L;
-            const dx = QP_L + picW + 20, dw = QP_R - dx - 10;
+            const PW = [28, 200, 50, 55, 75, 77], picW = hero ? 150 : 0, TAIL = 6 + 28 + 6 + 36, lw = 84, tw = QP_R - QP_L - lw, FULL = QP_R - QP_L;
+            const dx = QP_L + picW + (hero ? 20 : 12), dw = QP_R - dx - 10;   // without a picture the name and introduction use the full width
             let NC = 2, colW = (FULL - 10) / 2, kW = 96, vW = colW - kW - 8;
             const setCols = n => { NC = n; colW = (FULL - (n - 1) * 8) / n; kW = n === 3 ? 76 : 96; vW = colW - kW - 8; };
             const nameLines = WR(machineLabel, 11, dw, true).slice(0, 2);
@@ -6769,13 +6992,14 @@ async function generateQuotePdf() {
             const termsH = sz => terms.length ? 11 + terms.reduce((a, [l, t]) => a + Math.max(1, WR(t, sz, tw).length) * sz * 1.25 + 1.5, 0) : 0;
             const LPR = v.links.length > 3 ? Math.min(6, v.links.length) : 3;
             const linksH = v.links.length ? 11 + Math.ceil(v.links.length / LPR) * 20 + 3 : 0;
+            const boxOf = c => hero ? c.box : Math.min(c.box, Math.max(34, 18 + nameLines.length * 13 + (v.cap ? 11 : 0) + introAll.length * 9.4));
             const plan = cfg => {
                 setCols(cfg.c || 2);
-                const boxLines = Math.max(0, Math.floor((cfg.box - 14 - nameLines.length * 13 - (v.cap ? 11 : 0)) / 9.4));
+                const boxLines = Math.max(0, Math.floor((boxOf(cfg) - 14 - nameLines.length * 13 - (v.cap ? 11 : 0)) / 9.4));
                 const rest = introAll.slice(boxLines).join(' ');
                 const restLines = rest ? WR(rest, cfg.s, FULL) : [];
                 const restH = restLines.length ? restLines.length * (cfg.s + 2.1) + 4 : 0;
-                const need = cfg.box + 7 + restH + gridH(pairs, cfg.s) + featH(feats, cfg.s) + linksH + 11 + tableH(PW, true, priceRows, cfg.tb) + 14 + termsH(cfg.t) + TAIL;
+                const need = boxOf(cfg) + 7 + restH + gridH(pairs, cfg.s) + featH(feats, cfg.s) + linksH + 11 + tableH(PW, true, priceRows, cfg.tb) + 14 + termsH(cfg.t) + TAIL;
                 return { boxLines, restLines, need };
             };
             const CFGS = [
@@ -6797,14 +7021,15 @@ async function generateQuotePdf() {
             const termsOver = P.need > room;   // only possible with very long terms: they then go overleaf
 
             // Machine: fixed picture box on the left, name and introduction on the right
-            const boxH = cfg.box, top = y;
-            page.drawRectangle({ x: QP_L, y: H - (top + boxH), width: picW, height: boxH, color: C.white, borderColor: C.line, borderWidth: 0.8 });
+            const boxH = boxOf(cfg), top = y;
+            if (hero) page.drawRectangle({ x: QP_L, y: H - (top + boxH), width: picW, height: boxH, color: C.white, borderColor: C.line, borderWidth: 0.8 });
             if (hero) {
                 const fs = Math.min((picW - 12) / hero.width, (boxH - 12) / hero.height), iw = hero.width * fs, ih = hero.height * fs;
                 page.drawImage(hero, { x: QP_L + (picW - iw) / 2, y: H - (top + boxH) + (boxH - ih) / 2, width: iw, height: ih });
-            } else T('Machine picture', QP_L + (picW - W('Machine picture', 7)) / 2, top + boxH / 2, 7, { color: C.grey });
-            R(QP_L + picW + 8, top, QP_R, top + boxH, C.tint);
-            R(QP_L + picW + 8, top, QP_L + picW + 11, top + boxH, C.accent);
+            }
+            const bx0 = QP_L + picW + (hero ? 8 : 0);
+            R(bx0, top, QP_R, top + boxH, C.tint);
+            R(bx0, top, bx0 + 3, top + boxH, C.accent);
             let dy = top + 8;
             nameLines.forEach(ln => { T(ln, dx, dy + 10, 11, { bold: true, color: C.navy }); dy += 13; });
             if (v.cap) { T(fitText(v.cap, 8, dw), dx, dy + 8, 8, { bold: true, color: C.red }); dy += 11; }
@@ -6929,13 +7154,15 @@ async function generateQuotePdf() {
             st.textContent = 'Saving to the quote register…';
             let b64 = ''; const u8 = new Uint8Array(bytes);
             for (let i = 0; i < u8.length; i += 0x8000) b64 += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
-            const sv = await tlpApi({ action: 'quote_save', filename: fname, pdf_base64: btoa(b64), quote: {
+            const sv = await tlpApi({ action: 'quote_save', replace_id: editId, filename: fname, pdf_base64: btoa(b64), quote: {
+                made_by_name: mb.name || '', made_by_phone: mb.phone || '', made_by_email: mb.email || '',
                 quote_no: v.quoteNo, date: v.date, valid_until: v.validUntil, company_id: SL.id, company_name: SL.name,
                 customer: v.customer, contact: v.contact, customer_state: v.stateName, customer_gstin: v.gstin, customer_state_code: v.stateCode,
                 customer_address: v.addressRaw, customer_phone: v.phone, customer_email: v.email, lead_id: (qpEl('quotepdf-modal').dataset.leadId || ''),
                 items_text: v.items.map(it => it.desc + ' x ' + it.qtyText + ' @ ' + it.rate).join('\n').slice(0, 4000), form_json: (typeof qpSnapshot === 'function' ? JSON.stringify(qpSnapshot()).slice(0, 45000) : ''),
                 machine: machineLabel + (catalogItems.length > 1 ? ' + ' + (catalogItems.length - 1) + ' more' : ''), qty: v.items.reduce((a, it) => a + (it.q || 0), 0), amount: Math.round(v.taxable * 100) / 100, grand_total: Math.round(v.grand * 100) / 100, design: D.label } });
-            registerNote = sv.error ? ' Note: it was NOT saved to the quote register (' + sv.error.message + ').' : ' Saved to the quote register.';
+            registerNote = sv.error ? ' Note: it was NOT saved to the quote register (' + sv.error.message + ').' : editId ? ' The saved quotation was updated (same number, new PDF).' : ' Saved to the quote register.';
+            if (typeof tlpAfterQuote === 'function') tlpAfterQuote(v);
             if (!sv.error && typeof tlpQuotesChanged === 'function') tlpQuotesChanged();
         } else {
             // Offline fallback: bump this browser's counter only after a successful build
@@ -7000,14 +7227,15 @@ function qpLoadSnapshot(snap, keepDate) {
     Object.keys(snap.f).forEach(id => { const el = qpEl(id); if (!el || (keepDate === false && id === 'qp-date')) return; if (el.type === 'checkbox') el.checked = !!snap.f[id]; else el.value = snap.f[id]; });
     if (keepDate === false) qpEl('qp-date').value = qpToday();
     window.qpExtraProducts = (snap.extra || []).slice(); window.qpCharges = (snap.charges || []).slice();
-    qpEl('quotepdf-modal').dataset.productId = 'copy'; delete qpEl('quotepdf-modal').dataset.leadId;
+    qpEl('quotepdf-modal').dataset.productId = 'copy'; delete qpEl('quotepdf-modal').dataset.leadId; delete qpEl('quotepdf-modal').dataset.editId; delete qpEl('quotepdf-modal').dataset.editNo;
     qpRenderProducts(); qpRenderCharges(); qpRefreshNo();
 }
 function qpNewQuote(silent) {
-    const m = qpEl('quotepdf-modal'), keep = { 'qp-company': 1, 'qp-design': 1, 'qp-layout': 1, 'qp-gst-type': 1 };
+    const m = qpEl('quotepdf-modal'), keep = { 'qp-company': 1, 'qp-design': 1, 'qp-layout': 1, 'qp-gst-type': 1, 'qp-madeby-phone': 1, 'qp-madeby-email': 1 };
     m.querySelectorAll('input[id],textarea[id]').forEach(el => { if (el.type === 'checkbox') el.checked = false; else if (!keep[el.id]) el.value = ''; });
     qpEl('qp-qty').value = 1; qpEl('qpm-qty').value = 1; qpEl('qp-valid').value = 30; qpEl('qp-gst-rate').value = 18; qpEl('qp-gst-type').value = 'auto'; qpEl('qp-state').value = qpSellerFor(qpEl('qp-company').value).stateCode || '19';
-    window.qpExtraProducts = []; window.qpCharges = []; m.dataset.productId = 'blank'; delete m.dataset.leadId;
+    window.qpExtraProducts = []; window.qpCharges = []; m.dataset.productId = 'blank'; delete m.dataset.leadId; delete m.dataset.editId; delete m.dataset.editNo;
+    if (typeof tlpApplyQuotePrefs === 'function') tlpApplyQuotePrefs(true);
     if (typeof tlpBasketClear === 'function') tlpBasketClear();
     qpEl('qp-status').textContent = ''; qpEl('qp-gstin-msg').textContent = '';
     if (!silent) openQuotePdf(); qpRenderCharges();
