@@ -5815,7 +5815,17 @@ async function clickSyncButton() {
         else tlpMadeByTyped();
         sel.dataset.filled = '1';
         tlpApplyQuotePrefs(false);
+        tlpRefreshTeamThenFill();
     }
+    // The list of colleagues is read again when the form is opened, so a newly added person is there
+    let tlpTeamFetching = false, tlpTeamAt = 0;
+    function tlpRefreshTeamThenFill() {
+        const now = Date.now();
+        if (tlpTeamFetching || now - tlpTeamAt < 60000) return;
+        tlpTeamFetching = true; tlpTeamAt = now;
+        tlpLoadTeamList().then(() => { tlpTeamFetching = false; const m = document.getElementById('quotepdf-modal'); if (m && !m.classList.contains('hidden')) tlpPrepareQuoteForm(); }).catch(() => { tlpTeamFetching = false; });
+    }
+
     // force = a new blank quote: put the remembered choices back; otherwise only fill what is still empty
     function tlpApplyQuotePrefs(force) {
         const P = tlpPrefs || {}, set = (id, v, always) => { const el = document.getElementById(id); if (!el || v === undefined || v === null || v === '') return; if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === String(v))) return; if (always || force || !el.value) el.value = v; };
