@@ -1203,7 +1203,7 @@
                     currentFilter === cat
                     ? 'bg-blue-600 text-white shadow-md'
                     : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                }">${safeCat}</button>`;
+                }">${safeCat}<span class="ml-2 font-normal opacity-70">${cat === 'All' ? products.length : products.filter(p => String(p?.category || 'Uncategorized Machines').trim() === cat).length}</span></button>`;
             }).join('');
 
             renderSubcategoryChips();
@@ -1213,7 +1213,6 @@
 
         function filterCategory(cat) {
             currentFilter = cat;
-            tlpCat = { type: 'All', power: '', cap: '', sort: tlpCat.sort };
             renderCategoryChips();
             renderCatalog();
         }
@@ -1382,13 +1381,11 @@
             
             let filteredProducts = products.filter(p => {
                 const matchesCat = currentFilter === 'All' || p.category === currentFilter;
-                const matchesSub = tlpCatalogMatch(p);
                 const matchesSearch = !searchQuery || searchScoreProduct(p, searchQuery) > 0;
-                return matchesCat && matchesSub && matchesSearch;
+                return matchesCat && matchesSearch;
             });
 
             if (searchQuery) filteredProducts.sort((a,b)=>searchScoreProduct(b,searchQuery)-searchScoreProduct(a,searchQuery));
-            else filteredProducts = tlpCatalogSort(filteredProducts);
 
             if (filteredProducts.length === 0) {
                 grid.className = "col-span-full text-center py-12 text-slate-400";
@@ -5303,79 +5300,11 @@ async function clickSyncButton() {
     }
     function tlpFinderExample(t) { document.getElementById('finder-tab-query').value = t; tlpRunFinder(); }
     function tlpFinderClear() { document.getElementById('finder-tab-query').value = ''; tlpRunFinder(); }
-    // =====================================================================================================
-    // Catalog filters: machine type, power, capacity and sorting, shown under the main product categories
-    // =====================================================================================================
-    // First match wins, so the more specific kinds come first.
-    const TLP_TYPES = [
-        ['Weighing', /scale|weigh/], ['Drum Handling', /drum (?!mixer|roller)|^drum|barrel/], ['Pallet Trucks', /pallet truck|pallet jack/], ['Stackers', /stacker/],
-        ['Scissor Lifts & Tables', /scissor|die loader/], ['Goods Lifts', /goods lift|cargo lift/], ['Work Platforms', /work platform|arial|aerial|man lift|suspended platform/],
-        ['Forklifts', /fork ?lift/], ['Dock Equipment', /dock/],
-        ['Block & Paver Making', /paver|brick|block making/], ['Site Lifts & Cranes', /ladder lift|mini crane/],
-        ['Concrete Mixers & Pumps', /mixer|mixture|batch mix|concrete pump/], ['Hoists', /hoist/], ['Winches', /winch/], ['Cranes', /crane/],
-        ['Trolleys & Hand Trucks', /trolley|platform truck|sack truck|wheel ?barrow|cage|dollies|caddies/],
-        ['Rebar Bending', /bar bend|ring bend|stirrup|spiral bend|rebar bend/], ['Rebar Cutting', /bar cut|rebar cut/],
-        ['Rebar & Steel Processing', /rebar|de ?coil|straighten|thread|forging|punching|iron fold|iron worker|tying/],
-        ['Concrete Finishing', /plaster|trowel|screed|floor grind|scarif|label|level|road cutter|concrete cutter/], ['Compaction', /compactor|rammer|roller/],
-        ['Sand Screening', /screening|sieve/], ['Testing Machines', /testing/], ['Rock Breakers', /breaker/],
-        ['Lathes', /lathe/], ['Press Brakes', /press brake/], ['Shearing', /shear/], ['Drilling', /drill/], ['Boring & Welding', /boring|weld/], ['Milling', /milling/],
-        ['Hose Crimping', /crimp/], ['Presses', /press/], ['Rolling', /rolling/], ['Saws', /saw/], ['Grinders', /grind/], ['Pipe Machines', /pipe/]
-    ];
-    const tlpTypeCache = new Map();
-    function tlpTypeOf(p) {
-        const name = String(p.name || '');
-        if (tlpTypeCache.has(name)) return tlpTypeCache.get(name);
-        const n = name.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
-        const hit = TLP_TYPES.find(([, re]) => re.test(n));
-        const type = hit ? hit[0] : 'Other machines';
-        tlpTypeCache.set(name, type); return type;
-    }
-    const TLP_CAP_BANDS = [[0, 500, 'Up to 500 kg'], [500, 1000, '500 kg to 1 ton'], [1000, 2000, '1 to 2 ton'], [2000, 3000, '2 to 3 ton'], [3000, 5000, '3 to 5 ton'], [5000, Infinity, 'Above 5 ton']];
-    let tlpCat = { type: 'All', power: '', cap: '', sort: '' }, tlpRowMap = null, tlpRowMapFor = null;
-    function tlpRowOf(p) {
-        const ix = tlpBuildFinderIndex();
-        if (tlpRowMapFor !== ix) { tlpRowMap = new Map(ix.rows.map(r => [r.p, r])); tlpRowMapFor = ix; }
-        return tlpRowMap.get(p) || { caps: [], power: '', price: Number(p.price) || 0 };
-    }
-    const tlpCapOf = p => { const c = tlpRowOf(p).caps; return c.length ? c[0] : null; };
-    const tlpBandOf = p => { const c = tlpCapOf(p); if (c === null) return ''; const b = TLP_CAP_BANDS.find(([lo, hi]) => c > lo && c <= hi); return b ? b[2] : ''; };
-    const tlpPowerLabel = { manual: 'Manual', semi: 'Semi-electric', battery: 'Battery / electric' };
-    // used by the catalog for every product: the three filters below the main category
-    function tlpCatalogMatch(p) {
-        return (tlpCat.type === 'All' || tlpTypeOf(p) === tlpCat.type) && (!tlpCat.power || tlpRowOf(p).power === tlpCat.power) && (!tlpCat.cap || tlpBandOf(p) === tlpCat.cap);
-    }
-    function tlpCatalogSort(list) {
-        const s = tlpCat.sort, price = p => Number(p.price) || 0;
-        if (s === 'price-low') return list.slice().sort((a, b) => (price(a) || Infinity) - (price(b) || Infinity));
-        if (s === 'price-high') return list.slice().sort((a, b) => price(b) - price(a));
-        if (s === 'cap-low') return list.slice().sort((a, b) => (tlpCapOf(a) ?? Infinity) - (tlpCapOf(b) ?? Infinity));
-        if (s === 'cap-high') return list.slice().sort((a, b) => (tlpCapOf(b) ?? -1) - (tlpCapOf(a) ?? -1));
-        if (s === 'name') return list.slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
-        return list;
-    }
-    function tlpSetCat(key, value) { tlpCat[key] = value; if (key === 'type') { tlpCat.power = ''; tlpCat.cap = ''; } tlpRenderCatalogFilters(); renderCatalog(); }
-    function tlpClearCat() { tlpCat = { type: 'All', power: '', cap: '', sort: tlpCat.sort }; tlpRenderCatalogFilters(); renderCatalog(); }
+    // Catalog: one button per product sheet. Pressing a button shows every product of that sheet, nothing else.
     function tlpRenderCatalogFilters() {
         const box = document.getElementById('catalog-filters'); if (!box) return;
-        const inCat = products.filter(p => p && p.name && !/^name$/i.test(String(p.name).trim()) && (currentFilter === 'All' || p.category === currentFilter));
-        if (!inCat.length) { box.innerHTML = ''; return; }
-        const count = (list, f) => { const c = {}; list.forEach(p => { const k = f(p); if (k) c[k] = (c[k] || 0) + 1; }); return c; };
-        const types = count(inCat, tlpTypeOf), typeNames = Object.keys(types).sort((a, b) => (a === 'Other machines') - (b === 'Other machines') || types[b] - types[a] || a.localeCompare(b));
-        if (tlpCat.type !== 'All' && !types[tlpCat.type]) tlpCat = { type: 'All', power: '', cap: '', sort: tlpCat.sort };
-        const inType = inCat.filter(p => tlpCat.type === 'All' || tlpTypeOf(p) === tlpCat.type);
-        const powers = count(inType, p => tlpRowOf(p).power), bands = count(inType.filter(p => !tlpCat.power || tlpRowOf(p).power === tlpCat.power), tlpBandOf);
-        if (tlpCat.power && !powers[tlpCat.power]) tlpCat.power = '';
-        if (tlpCat.cap && !bands[tlpCat.cap]) tlpCat.cap = '';
-        const shown = inCat.filter(tlpCatalogMatch).length;
-        const chip = (on, label, n, click, tone) => `<button type="button" onclick="${click}" class="px-3.5 py-2 rounded-full text-xs font-semibold shrink-0 min-h-[38px] ${on ? (tone || 'bg-indigo-600') + ' text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">${tlpE(label)}${n === undefined ? '' : ` <span class="${on ? 'opacity-80' : 'text-slate-400'} font-normal">${n}</span>`}</button>`;
-        const row = (title, chips) => `<div><span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">${title}</span><div class="flex flex-wrap gap-2">${chips}</div></div>`;
-        const q = v => "'" + String(v).replace(/'/g, "\\'") + "'";
-        const active = tlpCat.type !== 'All' || tlpCat.power || tlpCat.cap;
-        box.innerHTML = row('Machine type', chip(tlpCat.type === 'All', 'All types', inCat.length, "tlpSetCat('type','All')") + typeNames.map(t => chip(tlpCat.type === t, t, types[t], `tlpSetCat('type',${q(t)})`)).join(''))
-            + (Object.keys(powers).length > 1 ? row('Power', chip(!tlpCat.power, 'Any', undefined, "tlpSetCat('power','')", 'bg-slate-800') + ['manual', 'semi', 'battery'].filter(k => powers[k]).map(k => chip(tlpCat.power === k, tlpPowerLabel[k], powers[k], `tlpSetCat('power','${k}')`, 'bg-slate-800')).join('')) : '')
-            + (Object.keys(bands).length > 1 ? row('Capacity', chip(!tlpCat.cap, 'Any', undefined, "tlpSetCat('cap','')", 'bg-slate-800') + TLP_CAP_BANDS.filter(b => bands[b[2]]).map(b => chip(tlpCat.cap === b[2], b[2], bands[b[2]], `tlpSetCat('cap',${q(b[2])})`, 'bg-slate-800')).join('')) : '')
-            + `<div class="flex flex-wrap items-center justify-between gap-2 pt-1"><p class="text-xs text-slate-600"><b>${shown}</b> of ${inCat.length} products${currentFilter === 'All' ? '' : ' in ' + tlpE(currentFilter)}${active ? ` · <button type="button" class="font-bold text-blue-700 underline" onclick="tlpClearCat()">Clear filters</button>` : ''}</p>
-                <label class="flex items-center gap-2 text-xs text-slate-600">Sort by <select onchange="tlpSetCat('sort',this.value)" class="border border-slate-300 rounded-lg px-2 py-1.5 bg-white text-xs">${[['', 'As in the sheet'], ['name', 'Name A to Z'], ['price-low', 'Price: low to high'], ['price-high', 'Price: high to low'], ['cap-low', 'Capacity: low to high'], ['cap-high', 'Capacity: high to low']].map(([v, t]) => `<option value="${v}" ${tlpCat.sort === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>`;
+        const n = products.filter(p => currentFilter === 'All' || p.category === currentFilter).length;
+        box.innerHTML = n ? `<p class="text-xs text-slate-600"><b>${n}</b> product${n === 1 ? '' : 's'}${currentFilter === 'All' ? ' in all categories' : ' in ' + tlpE(currentFilter)}</p>` : '';
     }
     // =====================================================================================================
     // Clients, GSTIN check, quote menu and Excel export, visiting-card / notes scanner
