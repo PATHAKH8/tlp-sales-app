@@ -1337,6 +1337,7 @@
         }
 
         function renderCatalog() {
+            tlpFixProductIds();
             const grid = document.getElementById('products-catalog-grid');
             const stateHeader = document.getElementById('catalog-state-header');
             const filterContainer = document.getElementById('catalog-filter-container');
@@ -2883,6 +2884,7 @@
 
             if (allProductsTemp.length > 0) {
                 products = allProductsTemp;
+                tlpFixProductIds();
                 uploadedFiles = allUploadedFilesTemp;
 
                 // Always return to the complete catalog after a multi-sheet reload.
@@ -4081,6 +4083,7 @@
 
             if (mergedProducts.length) {
                 products = mergedProducts;
+                tlpFixProductIds();
                 if (mergedUploads.length) uploadedFiles = mergedUploads;
 
                 currentFilter = 'All';
@@ -4264,6 +4267,7 @@ async function clickSyncButton() {
             let cachedProducts = JSON.parse(localStorage.getItem('tlp_cached_catalog')) || [];
             if (cachedProducts.length > 0) {
                 products = cachedProducts;
+                tlpFixProductIds();
             }
             
             // Function to load seed catalog
@@ -5305,6 +5309,22 @@ async function clickSyncButton() {
         const box = document.getElementById('catalog-filters'); if (!box) return;
         const n = products.filter(p => currentFilter === 'All' || p.category === currentFilter).length;
         box.innerHTML = n ? `<p class="text-xs text-slate-600"><b>${n}</b> product${n === 1 ? '' : 's'}${currentFilter === 'All' ? ' in all categories' : ' in ' + tlpE(currentFilter)}</p>` : '';
+    }
+
+    // Products from different sheets arrived with the same row numbers, so one sheet's pictures
+    // and details were shown on the other sheet's products. Every product gets a number of its own.
+    function tlpFixProductIds() {
+        if (!Array.isArray(products) || !products.length) return false;
+        const seen = new Set(); let next = 1, changed = false;
+        products.forEach(p => {
+            if (!p) return;
+            if (p.id === undefined || p.id === null || p.id === '' || seen.has(String(p.id))) {
+                while (seen.has(String(next))) next++;
+                p.id = next++; changed = true;
+            }
+            seen.add(String(p.id));
+        });
+        return changed;
     }
     // =====================================================================================================
     // Clients, GSTIN check, quote menu and Excel export, visiting-card / notes scanner
