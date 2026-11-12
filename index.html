@@ -5787,6 +5787,18 @@ async function clickSyncButton() {
         const sel = document.getElementById('qp-madeby'), o = sel.selectedOptions[0]; if (!o) return;
         document.getElementById('qp-madeby-phone').value = o.dataset.phone || '';
         document.getElementById('qp-madeby-email').value = o.dataset.email || '';
+        tlpMadeByTyped();
+    }
+    // Tells the user whether the number shown is the one saved against that person's login
+    function tlpMadeByTyped() {
+        const sel = document.getElementById('qp-madeby'), hint = document.getElementById('qp-madeby-hint'); if (!sel || !hint) return;
+        const o = sel.selectedOptions[0], mine = o && String(o.value) === String(currentUser.id), phone = (document.getElementById('qp-madeby-phone').value || '').trim();
+        hint.style.color = '';
+        if (!o || !o.value) { hint.textContent = 'The quotation will not show a contact person.'; return; }
+        const saved = (o.dataset.phone || '').trim();
+        if (!phone) { hint.textContent = mine ? 'No mobile number saved for your login. Type it here once and it is remembered for every quotation you make.' : 'No mobile number saved for ' + o.dataset.name + '.' + (tlpIsAdmin() ? ' Type it here and it is saved against their login.' : ' Ask the administrator to add it in Admin, under Team.'); return; }
+        hint.textContent = phone === saved ? 'This number is saved against ' + (mine ? 'your login' : o.dataset.name + "'s login") + '.'
+            : (mine || tlpIsAdmin()) ? 'This number will be saved against ' + (mine ? 'your login' : o.dataset.name + "'s login") + ' when the quotation is made.' : 'Used on this quotation only.';
     }
     function tlpPrepareQuoteForm() {
         const sel = document.getElementById('qp-madeby'); if (!sel || !currentUser) return;
@@ -5800,6 +5812,7 @@ async function clickSyncButton() {
         const before = sel.dataset.filled === '1';
         sel.value = want === undefined ? String(currentUser.id) : String(want);
         if (!before || (!document.getElementById('qp-madeby-phone').value && !document.getElementById('qp-madeby-email').value)) tlpMadeByChanged();
+        else tlpMadeByTyped();
         sel.dataset.filled = '1';
         tlpApplyQuotePrefs(false);
     }
@@ -5817,9 +5830,15 @@ async function clickSyncButton() {
         tlpPrefs = { company: g('qp-company'), design: g('qp-design'), layout: g('qp-layout'), gstRate: g('qp-gst-rate'), valid: g('qp-valid'), terms: g('qp-terms'), madeby: g('qp-madeby'), at: Date.now() };
         try { localStorage.setItem(tlpPrefsKey(), JSON.stringify(tlpPrefs)); } catch (e) {}
         const body = { action: 'me_update', prefs: JSON.stringify(tlpPrefs) };
-        // the phone typed for yourself is kept on your profile, so it is there next time and for your colleagues
-        if (String(g('qp-madeby')) === String(currentUser.id) && g('qp-madeby-phone').trim() !== String((tlpProfile && tlpProfile.phone) || '')) body.phone = g('qp-madeby-phone').trim();
+        // the phone typed for yourself is kept on your login, so it is there next time and for your colleagues
+        const who = String(g('qp-madeby')), phone = g('qp-madeby-phone').trim();
+        if (who === String(currentUser.id) && phone !== String((tlpProfile && tlpProfile.phone) || '')) body.phone = phone;
         tlpApi(body).then(r => { if (!r.error && r.data) { tlpProfile = Object.assign(tlpProfile || {}, { prefs: r.data.prefs, phone: r.data.phone }); if (body.phone !== undefined) tlpLoadTeamList(); } }).catch(() => {});
+        // an administrator may also fill in a colleague's number from the quotation form
+        const mate = tlpTeamList.find(u => String(u.id) === who);
+        if (tlpIsAdmin() && mate && who !== String(currentUser.id) && phone && phone !== String(mate.phone || '')) {
+            dataClient.from('profiles').update({ phone, updated_at: new Date().toISOString() }).eq('id', who).then(r => { if (!r.error) tlpLoadTeamList(); }).catch(() => {});
+        }
     }
 
     // ---------- Edit a saved quotation (same number, the PDF in Drive is replaced) ----------
@@ -6051,10 +6070,11 @@ textarea.qp-in{min-height:70px;font-family:ui-monospace,Menlo,Consolas,monospace
                             <option value="detailed">Detailed: separate offer, details and terms pages</option>
                         </select></div>
                     <div><label class="qp-l">&nbsp;</label><label class="flex items-center gap-2 text-xs text-slate-700" style="min-height:40px"><input type="checkbox" id="qp-annex"> Add full details page (complete description on a second page)</label></div>
-                    <div><label class="qp-l" for="qp-madeby">Quote made by (printed as the contact person)</label><select id="qp-madeby" class="qp-in" onchange="tlpMadeByChanged()"></select></div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="qp-l" for="qp-madeby-phone">Their phone</label><input id="qp-madeby-phone" class="qp-in" type="tel" placeholder="+91 ..."></div><div><label class="qp-l" for="qp-madeby-email">Their email</label><input id="qp-madeby-email" class="qp-in" type="email"></div></div>
+                    <div><label class="qp-l" for="qp-madeby">Quotation prepared by</label><select id="qp-madeby" class="qp-in" onchange="tlpMadeByChanged()"></select></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="qp-l" for="qp-madeby-phone">Mobile number</label><input id="qp-madeby-phone" class="qp-in" type="tel" placeholder="+91 ..." oninput="tlpMadeByTyped()"></div><div><label class="qp-l" for="qp-madeby-email">Email</label><input id="qp-madeby-email" class="qp-in" type="email"></div></div>
                 </div>
-                <p class="qp-hint">Your choices here (company, template, layout, contact person, GST and terms) are remembered for your next quotation.</p>
+                <p class="qp-hint" id="qp-madeby-hint"></p>
+                <p class="qp-hint">Your choices here (company, template, layout, the person who prepared it, GST and terms) are remembered for your next quotation.</p>
             </div>
 
             <div>
