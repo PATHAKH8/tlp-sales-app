@@ -3,10 +3,11 @@
  * ------------------------------------------------------
  * Paste into Extensions → Apps Script of your TL Pathak Google Sheet
  * (the same sheet your dashboard reads). Then:
- *   1. Run setup() once (approve permissions). It creates the admin account pathakh@gmail.com
- *      and prints a ONE-TIME temporary password in the Execution log (View → Logs). Sign in with it;
- *      the app makes you choose your own password straight away.
- *      (Locked out? Run resetAdminPassword() – it prints a new temporary password.)
+ *   1. LOGINS – to share the TL Pathak dashboard's accounts (same email + password, register → admin approves),
+ *      first set Script properties APP_SHEET_ID and APP_TOKEN_SECRET (see "users & sign-in" below).
+ *      Then run setup() once (approve permissions). It makes sure pathakh@gmail.com is an admin.
+ *      Standalone (no APP_SHEET_ID): setup() creates pathakh@gmail.com and prints a ONE-TIME password
+ *      in View → Logs; the app asks you to choose your own at first sign-in. (resetAdminPassword() prints a new one.)
  *   2. Project Settings → Script properties → set:
  *        GEMINI_KEY   = your Gemini API key (photo reading + "Ask the stock")
  *        GEMINI_MODEL = optional, default gemini-3.8-flash (any current model id from ai.google.dev/pricing)
@@ -16,7 +17,7 @@
  * Sheets created: Stock, Stock_Locations, Stock_Log, Purchase_Invoices, Purchases
  *   Purchases = one row per invoice line (group, rate, landed cost) → your dashboard reads buy prices from here.
  *   Purchase data, buy prices and price lists are only returned to admin accounts.
- * Users: Stock_Users (email, name, role admin|staff|viewer, branch) – passwords stored only as salted hashes.
+ * Users: shared with the dashboard's Users tab (linked mode) or Stock_Users here – passwords stored only as salted hashes.
  * Sales: Sales_Invoices (one row per bill), Sales (one row per line), Clients (one row per customer — your CRM list).
  */
 
@@ -65,16 +66,20 @@ function setup() {
   folder_();
   folder_('INV_FOLDER', 'TL Pathak Purchase Invoices');
   folder_('SALE_FOLDER', 'TL Pathak Sales Invoices');
-  ensure_(ss, SH_USR, USR_COLS);
+  if (!linked_()) ensure_(ss, SH_USR, USR_COLS);
   bump_();
-  if (!findUser_(OWNER_EMAIL)) {
+  const owner = findUser_(OWNER_EMAIL);
+  if (owner && linked_()) {
+    if (owner.role !== 'admin' || !owner.active) upsertUser_({ email: OWNER_EMAIL, role: 'admin', active: true }, false);
+    Logger.log('Linked to the dashboard accounts. Sign in as ' + OWNER_EMAIL + ' with your DASHBOARD password.');
+  } else if (!owner) {
     const tmp = upsertUser_({ email: OWNER_EMAIL, name: 'Hitesh Pathak', role: 'admin', active: true }, true);
     Logger.log('Admin account created: ' + OWNER_EMAIL + '   ONE-TIME password: ' + tmp + '   (you will set your own at first sign-in)');
   } else Logger.log('Setup done. Admin ' + OWNER_EMAIL + ' already exists (run resetAdminPassword() if you forgot the password).');
   Logger.log('Add GEMINI_KEY in Project Settings → Script properties.');
 }
 function resetAdminPassword() {
-  ensure_(ss_(), SH_USR, USR_COLS);
+  if (!linked_()) ensure_(ss_(), SH_USR, USR_COLS);
   const tmp = upsertUser_({ email: OWNER_EMAIL, name: (findUser_(OWNER_EMAIL) || {}).name || 'Hitesh Pathak', role: 'admin', active: true }, true);
   Logger.log('New ONE-TIME password for ' + OWNER_EMAIL + ': ' + tmp);
 }
@@ -112,26 +117,30 @@ function handle_(p, isPost) {
   try {
     const a = p.action || 'all';
     if (a === 'login') return out_(login_(String(p.email || ''), String(p.password || '')), cb);
+    if (a === 'register') { const lk = LockService.getScriptLock(); lk.waitLock(20000); try { return out_(register_(p.name, p.email, String(p.password || '')), cb); } finally { lk.releaseLock(); } }
+    if (a === 'mode') return out_({ ok: true, linked: linked_(), shared: linked_() && !!P.getProperty('APP_TOKEN_SECRET') }, cb);
     const me = session_(String(p.session || ''));
     if (!me) return out_({ ok: false, error: 'SIGNED_OUT' }, cb);
     if (a === 'logout') { P.deleteProperty('S_' + p.session); return out_({ ok: true }, cb); }
     if (a === 'changePassword') return out_(changePw_(me, String(p.old || ''), String(p.password || '')), cb);
     if (me.mustChange) return out_({ ok: false, error: 'CHANGE_PASSWORD' }, cb);
     if (a === 'me') return out_({ ok: true, user: pub_(me) }, cb);
-    const admin = me.role === 'admin', viewer = me.role === 'viewer';
-    if (a === 'users') { if (!admin) return out_({ ok: false, error: 'Admins only' }, cb); return out_({ ok: true, users: rows_(SH_USR, USR_COLS).map(pub_) }, cb); }
+    if (a === 'myLocation') { if (p.location) P.setProperty('LOC_' + me.email, String(p.location)); return out_({ ok: true }, cb); }
+    const admin = me.role === 'admin', viewer = me.role === 'viewer', cost = admin || !!me.cost;
+    if (a === 'users') { if (!admin) return out_({ ok: false, error: 'Admins only' }, cb); return out_({ ok: true, linked: linked_(), users: allUsers_().map(pub_) }, cb); }
     if (a === 'saveUser' || a === 'resetPassword') {
       if (!admin) return out_({ ok: false, error: 'Admins only' }, cb);
-      const u = p.user || {}; if (a === 'resetPassword') { const ex = findUser_(p.email); if (!ex) throw new Error('No such user'); u.email = ex.email; u.name = ex.name; u.role = ex.role; u.location = ex.location; u.active = true; }
+      const u = p.user || {}; if (a === 'resetPassword') { const ex = findUser_(p.email); if (!ex) throw new Error('No such user'); u.email = ex.email; }
+      if (typeof u.active === 'string') u.active = u.active === 'true'; if (typeof u.cost === 'string') u.cost = u.cost === 'true';
       if (String(u.email).toLowerCase() === OWNER_EMAIL && (u.role !== 'admin' || u.active === false)) throw new Error('The owner account must stay an active admin');
       const isNew = !findUser_(u.email);
       const tmp = upsertUser_(u, a === 'resetPassword' || isNew);
-      return out_({ ok: true, tempPassword: tmp || '', users: rows_(SH_USR, USR_COLS).map(pub_) }, cb);
+      return out_({ ok: true, tempPassword: tmp || '', users: allUsers_().map(pub_) }, cb);
     }
     if (!isPost) {
       if (a === 'ver') return out_({ ok: true, ver: P.getProperty('VER') || '0' }, cb);
-      if (a === 'all') return out_({ ok: true, data: state_(admin) }, cb);
-      if (a === 'buyPrices') { if (!admin) return out_({ ok: false, error: 'Admins only' }, cb); return out_({ ok: true, data: buyPrices_() }, cb); }
+      if (a === 'all') return out_({ ok: true, data: state_(cost) }, cb);
+      if (a === 'buyPrices') { if (!cost) return out_({ ok: false, error: 'Your login cannot see buy prices' }, cb); return out_({ ok: true, data: buyPrices_() }, cb); }
       if (a === 'summary') return out_({ ok: true, data: summary_(p.q || '', p.location || '') }, cb);
       return out_({ ok: false, error: 'Unknown action' }, cb);
     }
@@ -155,17 +164,17 @@ function handle_(p, isPost) {
         case 'deleteItem': if (!admin) throw new Error('Admins only'); res = deleteItem_(p.id, by); break;
         case 'saveLocation': if (!admin) throw new Error('Admins only'); res = saveLoc_(p.loc || {}); break;
         case 'deleteLocation': if (!admin) throw new Error('Admins only'); res = deleteLoc_(p.id); break;
-        case 'savePurchase': if (!admin) throw new Error('Admins only'); res = savePurchase_(p.rec || {}, p.photos || [], by); break;
+        case 'savePurchase': if (!cost) throw new Error('Your login cannot see buy prices'); res = savePurchase_(p.rec || {}, p.photos || [], by); break;
         case 'saveSale': res = saveSale_(p.rec || {}, p.photos || [], by); break;
         case 'deleteSale': if (!admin) throw new Error('Admins only'); res = deleteSale_(p.id); break;
-        case 'savePriceList': if (!admin) throw new Error('Admins only'); res = savePriceList_(p.rec || {}, p.photos || [], by); break;
+        case 'savePriceList': if (!cost) throw new Error('Your login cannot see buy prices'); res = savePriceList_(p.rec || {}, p.photos || [], by); break;
         case 'deletePriceList': if (!admin) throw new Error('Admins only'); res = deletePriceList_(p.id); break;
         case 'deletePurchase': if (!admin) throw new Error('Admins only'); res = deletePurchase_(p.id); break;
         default: throw new Error('Unknown action');
       }
       bump_();
       SpreadsheetApp.flush();
-      return out_({ ok: true, res: res, data: state_(admin) });
+      return out_({ ok: true, res: res, data: state_(cost) });
     } finally { lock.releaseLock(); }
   } catch (err) {
     return out_({ ok: false, error: String(err && err.message || err) }, cb);
@@ -503,58 +512,154 @@ function deletePriceList_(id) {
   return {};
 }
 
-/* ---------------- users & sign-in ---------------- */
+/* ---------------- users & sign-in ----------------
+ * TWO MODES
+ *  A) LINKED to the TL Pathak dashboard / sales app (recommended): set Script properties
+ *       APP_SHEET_ID      = ID of the "TL Pathak App Data" Google Sheet (from its URL)
+ *       APP_TOKEN_SECRET  = copy of TOKEN_SECRET from the dashboard's Apps Script properties
+ *     → the SAME accounts (Users tab) work in both apps: register → admin approves → sign in.
+ *       role "admin" = admin here; "can_view_cost" ticked = sees buy prices / purchase bills / price lists.
+ *       A person already signed in to the dashboard on that browser is signed in here automatically.
+ *  B) STANDALONE: accounts live in this sheet's Stock_Users tab.
+ */
 function norm_(e) { return String(e || '').trim().toLowerCase(); }
-function findUser_(email) { const e = norm_(email); return e ? rows_(SH_USR, USR_COLS).find(u => norm_(u.email) === e) || null : null; }
-function pub_(u) { return { email: norm_(u.email), name: u.name || '', role: u.role || 'staff', location: u.location || '', active: u.active === true || u.active === 'TRUE', mustChange: u.mustChange === true || u.mustChange === 'TRUE', lastLogin: +u.lastLogin || 0 }; }
-function hash_(pw, salt) {
-  let h = salt + '|' + pw;
-  for (let i = 0; i < 300; i++) h = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, h + salt, Utilities.Charset.UTF_8));
-  return h;
+function tru_(v) { return v === true || String(v).toUpperCase() === 'TRUE'; }
+function linked_() { return !!P.getProperty('APP_SHEET_ID'); }
+function appUsers_() {
+  const sh = SpreadsheetApp.openById(P.getProperty('APP_SHEET_ID')).getSheetByName('Users');
+  if (!sh) throw new Error('Users tab not found in the dashboard sheet (APP_SHEET_ID)');
+  const v = sh.getDataRange().getValues(), h = (v[0] || []).map(x => String(x).trim());
+  const rows = [];
+  for (let r = 1; r < v.length; r++) { const o = { _row: r + 1 }; h.forEach((k, c) => o[k] = v[r][c]); if (o.email) rows.push(o); }
+  return { sh: sh, h: h, rows: rows };
 }
+function setCells_(t, row, changes) { Object.keys(changes).forEach(k => { const c = t.h.indexOf(k); if (c >= 0) t.sh.getRange(row._row, c + 1).setValue(changes[k]); }); }
+function hasStock_(access) { const a = String(access || '').trim(); return !a || a.split(',').map(x => x.trim()).indexOf('stock') >= 0; }
+/* one shape for both modes: {id,email,name,role(admin|staff|viewer),cost,active,pending,location,mustChange,lastLogin} */
+function userFrom_(raw) {
+  if (linked_()) {
+    const admin = String(raw.role || '').toLowerCase() === 'admin';
+    return { id: String(raw.id || ''), email: norm_(raw.email), name: raw.full_name || raw.email, role: admin ? 'admin' : 'staff', cost: admin || tru_(raw.can_view_cost),
+      active: tru_(raw.approved) && (admin || hasStock_(raw.access)), pending: !tru_(raw.approved), noStock: tru_(raw.approved) && !admin && !hasStock_(raw.access),
+      location: P.getProperty('LOC_' + norm_(raw.email)) || '', mustChange: P.getProperty('MC_' + norm_(raw.email)) === '1', lastLogin: +(P.getProperty('LL_' + norm_(raw.email)) || 0),
+      _salt: raw.salt, _hash: raw.password_hash, _raw: raw };
+  }
+  return { id: norm_(raw.email), email: norm_(raw.email), name: raw.name || raw.email, role: raw.role || 'staff', cost: raw.role === 'admin', active: tru_(raw.active),
+    pending: !tru_(raw.active) && P.getProperty('PEND_' + norm_(raw.email)) === '1',
+    location: raw.location || '', mustChange: tru_(raw.mustChange), lastLogin: +raw.lastLogin || 0, _salt: raw.salt, _hash: raw.passHash, _raw: raw };
+}
+function pub_(u) { return { email: u.email, name: u.name, role: u.role, cost: !!u.cost, active: !!u.active, pending: !!u.pending, noStock: !!u.noStock, location: u.location || '', mustChange: !!u.mustChange, lastLogin: u.lastLogin || 0 }; }
+function allUsers_() { return linked_() ? appUsers_().rows.map(userFrom_) : rows_(SH_USR, USR_COLS).map(userFrom_); }
+function findUser_(email) { const e = norm_(email); return e ? allUsers_().find(u => u.email === e) || null : null; }
+/* hashing: linked mode uses the dashboard's exact scheme so passwords match in both apps */
+function toHex_(b) { let s = ''; for (let i = 0; i < b.length; i++) { const x = (b[i] + 256) % 256; s += (x < 16 ? '0' : '') + x.toString(16); } return s; }
+function hashDash_(pw, salt) { let v = salt + ':' + pw; for (let i = 0; i < 300; i++) v = toHex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, v, Utilities.Charset.UTF_8)); return v; }
+function hash_(pw, salt) { let h = salt + '|' + pw; for (let i = 0; i < 300; i++) h = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, h + salt, Utilities.Charset.UTF_8)); return h; }
+function hashFor_(pw, salt) { return linked_() ? hashDash_(pw, salt) : hash_(pw, salt); }
 function tempPw_() { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 10; i++) s += c.charAt(Math.floor(Math.random() * c.length)); return s; }
+function setPassword_(u, pw, mustChange) {
+  const salt = Utilities.getUuid(), h = hashFor_(pw, salt);
+  if (linked_()) { const t = appUsers_(), row = t.rows.find(r => norm_(r.email) === u.email); setCells_(t, row, { salt: salt, password_hash: h, updated_at: new Date().toISOString() }); }
+  else { const sh = ss_().getSheetByName(SH_USR), row = rows_(SH_USR, USR_COLS).find(r => norm_(r.email) === u.email); sh.getRange(row._row, USR_COLS.indexOf('salt') + 1, 1, 2).setValues([[salt, h]]); }
+  setMustChange_(u.email, mustChange);
+}
+function setMustChange_(email, on) {
+  if (linked_()) { if (on) P.setProperty('MC_' + email, '1'); else P.deleteProperty('MC_' + email); return; }
+  const row = rows_(SH_USR, USR_COLS).find(r => norm_(r.email) === email); if (row) ss_().getSheetByName(SH_USR).getRange(row._row, USR_COLS.indexOf('mustChange') + 1).setValue(!!on);
+}
+/* create or edit a user (admin). Returns a one-time password when one is issued. */
 function upsertUser_(u, newTempPassword) {
   const email = norm_(u.email);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Enter a valid email');
-  const sh = ss_().getSheetByName(SH_USR), ex = findUser_(email), now = Date.now();
-  const role = ROLES.indexOf(u.role) >= 0 ? u.role : (ex ? ex.role : 'staff');
-  const rec = ex ? Object.assign({}, ex) : { email: email, createdAt: now, salt: '', passHash: '', mustChange: true, lastLogin: '' };
-  rec.name = String(u.name || rec.name || email.split('@')[0]).slice(0, 60); rec.role = role; rec.location = u.location !== undefined ? u.location : (rec.location || '');
-  rec.active = u.active === undefined ? (ex ? (ex.active === true || ex.active === 'TRUE') : true) : !!u.active;
+  const ex = findUser_(email), now = Date.now();
+  if (u.location !== undefined) { if (u.location) P.setProperty('LOC_' + email, u.location); else P.deleteProperty('LOC_' + email); }
+  if (linked_()) {
+    const t = appUsers_();
+    if (!ex) {
+      const row = { id: Utilities.getUuid(), email: email, full_name: String(u.name || email.split('@')[0]), role: u.role === 'admin' ? 'admin' : 'sales', approved: u.active !== false,
+        can_view_cost: u.role === 'admin' || !!u.cost, can_edit_prices: u.role === 'admin', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), salt: '', password_hash: '' };
+      let rowNo = 2; const ids = t.sh.getRange(2, 1, Math.max(t.sh.getLastRow() - 1, 1), 1).getValues();
+      for (let i = 0; i < ids.length; i++) if (ids[i][0] !== '') rowNo = i + 3;   // the dashboard pre-fills checkbox rows
+      t.sh.getRange(rowNo, 1, 1, t.h.length).setValues([t.h.map(k => row[k] === undefined ? '' : row[k])]);
+    } else {
+      const row = t.rows.find(r => norm_(r.email) === email), ch = { updated_at: new Date().toISOString() };
+      if (u.name) ch.full_name = u.name;
+      if (u.role) ch.role = u.role === 'admin' ? 'admin' : (String(row.role).toLowerCase() === 'admin' ? 'sales' : row.role || 'sales');
+      if (u.active !== undefined) ch.approved = !!u.active;
+      if (u.cost !== undefined || u.role === 'admin') ch.can_view_cost = u.role === 'admin' || !!u.cost;
+      if (u.active && String(row.access || '').trim() && !hasStock_(row.access)) ch.access = String(row.access).trim() + ',stock';
+      setCells_(t, row, ch);
+    }
+  } else {
+    const sh = ss_().getSheetByName(SH_USR), raw = ex ? ex._raw : { email: email, createdAt: now, salt: '', passHash: '', mustChange: true, lastLogin: '' };
+    raw.name = String(u.name || raw.name || email.split('@')[0]).slice(0, 60); raw.role = ROLES.indexOf(u.role) >= 0 ? u.role : (raw.role || 'staff');
+    raw.location = u.location !== undefined ? u.location : (raw.location || ''); raw.active = u.active === undefined ? (ex ? ex.active : true) : !!u.active;
+    const line = USR_COLS.map(k => raw[k] === undefined ? '' : raw[k]);
+    if (ex) sh.getRange(raw._row, 1, 1, line.length).setValues([line]); else sh.appendRow(line);
+  }
   let tmp = '';
-  if (newTempPassword) { tmp = tempPw_(); rec.salt = Utilities.getUuid(); rec.passHash = hash_(tmp, rec.salt); rec.mustChange = true; }
-  const row = USR_COLS.map(k => rec[k] === undefined ? '' : rec[k]);
-  if (ex) sh.getRange(ex._row, 1, 1, row.length).setValues([row]); else sh.appendRow(row);
-  if (ex && !rec.active) endSessions_(email);
+  if (newTempPassword) { tmp = tempPw_(); setPassword_(findUser_(email), tmp, true); }
+  if (u.active) P.deleteProperty('PEND_' + email);
+  if (ex && u.active === false) endSessions_(email);
   return tmp;
+}
+function register_(name, email, pw) {
+  email = norm_(email); name = String(name || '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, error: 'Enter a valid email' };
+  if (!name) return { ok: false, error: 'Enter your name' };
+  if (pw.length < 8) return { ok: false, error: 'Password must be at least 8 characters' };
+  if (findUser_(email)) return { ok: false, error: 'This email is already registered — sign in, or ask the admin to reset your password' };
+  if (allUsers_().filter(u => u.pending).length >= 100) return { ok: false, error: 'Too many pending registrations — ask the admin' };
+  upsertUser_({ email: email, name: name, role: 'staff', active: false }, false);
+  if (!linked_()) P.setProperty('PEND_' + email, '1');
+  setPassword_(findUser_(email), pw, false);
+  return { ok: true, pending: true };
+}
+function issueSession_(u) {
+  const sec = P.getProperty('APP_TOKEN_SECRET');
+  if (linked_() && sec && u.id) {   // same token format as the dashboard → one sign-in works in both apps
+    const payload = u.id + '.' + (Date.now() + 30 * 864e5);
+    return { token: payload + '.' + toHex_(Utilities.computeHmacSha256Signature(payload, sec)), shared: true };
+  }
+  const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  P.setProperty('S_' + token, JSON.stringify({ email: u.email, exp: Date.now() + 30 * 864e5 }));
+  return { token: token, shared: false };
 }
 function login_(email, pw) {
   const e = norm_(email), cache = CacheService.getScriptCache(), k = 'lf_' + e, fails = +(cache.get(k) || 0);
   if (fails >= 8) return { ok: false, error: 'Too many wrong tries — wait 15 minutes' };
   const u = findUser_(e);
-  if (!u || !(u.active === true || u.active === 'TRUE') || !u.passHash || hash_(pw, u.salt) !== u.passHash) { cache.put(k, String(fails + 1), 900); Utilities.sleep(400); return { ok: false, error: 'Wrong email or password' }; }
+  if (!u || !u._hash || hashFor_(pw, u._salt) !== u._hash) { cache.put(k, String(fails + 1), 900); Utilities.sleep(400); return { ok: false, error: 'Wrong email or password' }; }
   cache.remove(k);
-  const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
-  P.setProperty('S_' + token, JSON.stringify({ email: e, exp: Date.now() + 30 * 864e5 }));
-  ss_().getSheetByName(SH_USR).getRange(u._row, USR_COLS.indexOf('lastLogin') + 1).setValue(Date.now());
+  if (u.pending) return { ok: false, error: 'Your account is waiting for admin approval' };
+  if (u.noStock) return { ok: false, error: 'Your login does not include the stock app — ask the admin' };
+  if (!u.active) return { ok: false, error: 'Your account is disabled — ask the admin' };
+  const s = issueSession_(u);
+  P.setProperty('LL_' + u.email, String(Date.now()));
+  if (!linked_()) { const row = rows_(SH_USR, USR_COLS).find(r => norm_(r.email) === u.email); ss_().getSheetByName(SH_USR).getRange(row._row, USR_COLS.indexOf('lastLogin') + 1).setValue(Date.now()); }
   cleanSessions_();
-  return { ok: true, session: token, user: pub_(u) };
+  return { ok: true, session: s.token, shared: s.shared, user: pub_(u) };
 }
 function session_(token) {
-  if (!token || token.length < 40) return null;
+  if (!token) return null;
+  const sec = P.getProperty('APP_TOKEN_SECRET'), parts = String(token).split('.');
+  if (linked_() && sec && parts.length === 3) {
+    const payload = parts[0] + '.' + parts[1];
+    if (toHex_(Utilities.computeHmacSha256Signature(payload, sec)) !== parts[2] || +parts[1] < Date.now()) return null;
+    const u = allUsers_().find(x => x.id === parts[0]);
+    return u && u.active ? u : null;
+  }
+  if (token.length < 40) return null;
   let s; try { s = JSON.parse(P.getProperty('S_' + token) || 'null'); } catch (e) { return null; }
   if (!s || s.exp < Date.now()) { if (s) P.deleteProperty('S_' + token); return null; }
   const u = findUser_(s.email);
-  if (!u || !(u.active === true || u.active === 'TRUE')) return null;
-  const pu = pub_(u); pu._row = u._row; pu.salt = u.salt; pu.passHash = u.passHash; return pu;
+  return u && u.active ? u : null;
 }
 function changePw_(me, old, pw) {
-  if (hash_(old, me.salt) !== me.passHash) return { ok: false, error: 'Current password is wrong' };
+  if (hashFor_(old, me._salt) !== me._hash) return { ok: false, error: 'Current password is wrong' };
   if (pw.length < 8) return { ok: false, error: 'Use at least 8 characters' };
   if (pw === old) return { ok: false, error: 'Choose a new password' };
-  const salt = Utilities.getUuid(), sh = ss_().getSheetByName(SH_USR);
-  sh.getRange(me._row, USR_COLS.indexOf('salt') + 1, 1, 3).setValues([[salt, hash_(pw, salt), false]]);
-  me.mustChange = false;
+  setPassword_(me, pw, false);
   return { ok: true, user: pub_(Object.assign({}, me, { mustChange: false })) };
 }
 function endSessions_(email) { const all = P.getProperties(); Object.keys(all).forEach(k => { if (k.indexOf('S_') === 0) { try { if (JSON.parse(all[k]).email === email) P.deleteProperty(k); } catch (e) {} } }); }

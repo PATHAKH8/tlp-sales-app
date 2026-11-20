@@ -301,6 +301,7 @@ let snap=newSnap(),inv=newInv();
 function newSnap(){return {photos:[],busy:false,err:'',active:false,manual:false,aiDone:false,groupTouched:false,form:{name:'',category:'Machine Tools',type:'',size:'',group:'',brand:'',model:'',serial:'',condition:'New',specs:[],locationId:myLoc(),qty:1,status:'In stock',notes:'',confidence:'',tip:''}}}
 function newInv(){return {photos:[],busy:false,err:'',active:false,aiDone:false,saving:false,f:{supplier:'',gstin:'',invoiceNo:'',date:new Date().toISOString().slice(0,10),locationId:myLoc(),lines:[],tax:0,freight:0,total:0,notes:'',confidence:''}}}
 const isAdmin=()=>MODE==='claude'?K.canEdit:MODE==='sheet'?!!(CFG.user&&CFG.user.role==='admin'):false;
+const canCost=()=>MODE==='claude'?K.canEdit:MODE==='sheet'?!!(CFG.user&&(CFG.user.role==='admin'||CFG.user.cost)):false;
 const meTag=()=>MODE==='claude'?(K.meId||''):((CFG.user&&CFG.user.name)||'Someone');
 
 /* ================= helpers ================= */
@@ -504,7 +505,7 @@ async function askStock(){
   const qEl=$('#askQ'),out=$('#askA'),btn=$('#askBtn');const question=(qEl.value||'').trim();if(!question)return;
   btn.disabled=true;out.textContent='Thinking…';
   const rows=S.items.filter(live).slice(0,600).map(i=>[groupOf(i),i.name,locNm(i.locationId),'qty '+q(i),i.status||'In stock',i.model||'',i.condition||''].join(' | ')).join('\n');
-  let buy='';if(isAdmin()&&(S.purchases.length||S.pricelists.length)){buy='\nCost prices (group | last invoice rate excl. GST | avg | supplier | date | cheapest price-list net | price-list maker):\n'+buyTable().slice(0,250).map(b=>[b.group,b.last||'-',b.avg||'-',b.supplier,b.date,b.pl?b.pl.net:'-',b.pl?b.pl.mfr:'-'].join(' | ')).join('\n')}
+  let buy='';if(canCost()&&(S.purchases.length||S.pricelists.length)){buy='\nCost prices (group | last invoice rate excl. GST | avg | supplier | date | cheapest price-list net | price-list maker):\n'+buyTable().slice(0,250).map(b=>[b.group,b.last||'-',b.avg||'-',b.supplier,b.date,b.pl?b.pl.net:'-',b.pl?b.pl.mfr:'-'].join(' | ')).join('\n')}
   const prompt=`You answer questions about TL Pathak Group's live machine stock across its showrooms and warehouses. Today is ${new Date().toDateString()}.
 Locations: ${S.locations.map(l=>l.name+' ('+(l.kind||'showroom')+')').join(', ')}
 Stock rows (group | name | location | qty | status | model | condition):
@@ -526,7 +527,7 @@ function buyTable(){
     if(!arr.length)return {group,listOnly:true,last:0,lastLanded:pb?pb.net:0,avg:0,min:0,supplier:pb?pb.mfr:'',date:pb?pb.date:'',buys:0,qtyBought:0,stock,stockValue:Math.round(stock*(pb?pb.net:0)),pl:pb};
     return {group,last:Math.round(arr[0].rate),lastLanded:Math.round(arr[0].landed),avg:Math.round(arr.reduce((a,x)=>a+x.rate*x.qty,0)/tq),min:Math.round(Math.min(...arr.map(x=>x.rate))),supplier:arr[0].supplier||'',date:arr[0].date||'',buys:arr.length,qtyBought:tq,stock,stockValue:Math.round(stock*arr[0].landed),pl:pb}}).sort((a,b)=>a.group.localeCompare(b.group));
 }
-function buyFor(group){return isAdmin()?buyTable().find(b=>b.group===group):null}
+function buyFor(group){return canCost()?buyTable().find(b=>b.group===group):null}
 
 /* ================= render ================= */
 function tabsHTML(){
@@ -562,23 +563,23 @@ function homeV(v){
   const byLoc={};L.forEach(i=>{byLoc[i.locationId]=(byLoc[i.locationId]||0)+q(i)});const maxL=Math.max(1,...Object.values(byLoc));
   const byCat={};L.forEach(i=>{const c=i.category||'Other';byCat[c]=(byCat[c]||0)+q(i)});const maxC=Math.max(1,...Object.values(byCat));
   const recent=[...S.items].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).slice(0,5);
-  const sv=isAdmin()?buyTable().reduce((a,b)=>a+b.stockValue,0):0;
+  const sv=canCost()?buyTable().reduce((a,b)=>a+b.stockValue,0):0;
   v.innerHTML=`
   <div class="stats">
     <div class="stat hero"><div class="v num">${units}</div><div class="l">Machines in stock</div></div>
     <div class="stat"><div class="v num">${free}</div><div class="l">Free to sell</div></div>
     <div class="stat"><div class="v num">${groups}</div><div class="l">Machine groups</div></div>
-    ${isAdmin()?`<div class="stat"><div class="v num" style="font-size:22px">${sv?inr(sv):'—'}</div><div class="l">Stock value at cost <span class="lock">ADMIN</span></div></div>`:`<div class="stat"><div class="v num">${S.locations.length}</div><div class="l">Showrooms &amp; warehouses</div></div>`}
+    ${canCost()?`<div class="stat"><div class="v num" style="font-size:22px">${sv?inr(sv):'—'}</div><div class="l">Stock value at cost <span class="lock">ADMIN</span></div></div>`:`<div class="stat"><div class="v num">${S.locations.length}</div><div class="l">Showrooms &amp; warehouses</div></div>`}
   </div>
   <button class="cta" data-go="snap"><div class="ic">${IC.cam}</div><div><b>Snap a machine</b><span>Photo → AI reads type, size &amp; nameplate → added to stock</span></div></button>
   <button class="cta" data-gosale="1" style="background:linear-gradient(120deg,var(--ok),#146A3A);margin-top:-2px"><div class="ic">${IC.sell}</div><div><b>Snap a sales invoice</b><span>AI reads client details &amp; machines sold → stock out + client saved</span></div></button>
-  ${isAdmin()?`<button class="cta" data-goinv="1" style="background:linear-gradient(120deg,var(--blue),var(--blue-d));margin-top:-2px"><div class="ic">${IC.buy}</div><div><b>Snap a purchase invoice</b><span>AI reads supplier, items &amp; rates → buy prices + stock in</span></div></button>`:''}
+  ${canCost()?`<button class="cta" data-goinv="1" style="background:linear-gradient(120deg,var(--blue),var(--blue-d));margin-top:-2px"><div class="ic">${IC.buy}</div><div><b>Snap a purchase invoice</b><span>AI reads supplier, items &amp; rates → buy prices + stock in</span></div></button>`:''}
   <div class="h">By location <button data-go="places">All places</button></div>
   <div class="card" style="padding:4px 14px">${sortedLocs().length?sortedLocs().map(l=>`<button class="bar-row" data-loc="${esc(l.id)}"><div class="nm"><span class="t">${esc(l.name)}</span><span class="tag ${l.kind==='warehouse'?'wh':''}">${l.kind==='warehouse'?'WH':'SR'}</span></div><div class="num">${byLoc[l.id]||0}</div><div class="bar"><i style="width:${((byLoc[l.id]||0)/maxL*100).toFixed(0)}%"></i></div></button>`).join(''):`<div class="empty">No locations yet.</div>`}</div>
   <div class="h">By category</div>
   <div class="card" style="padding:4px 14px">${Object.keys(byCat).length?Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<button class="bar-row" data-cat="${esc(c)}"><div class="nm"><span class="t">${esc(c)}</span></div><div class="num">${n}</div><div class="bar"><i style="width:${(n/maxC*100).toFixed(0)}%;background:var(--red)"></i></div></button>`).join(''):`<div class="empty"><b>No stock yet</b>Tap the red camera and snap your first machine.</div>`}</div>
   <div class="h">Ask the stock</div>
-  <div class="card"><div class="row"><input id="askQ" class="inp" placeholder="${isAdmin()?'e.g. What did we pay for 6 ft lathes?':'e.g. Where do we have 8 ft lathes?'}" enterkeyhint="send"><button id="askBtn" class="btn">Ask</button></div><div id="askA" class="answer"></div></div>
+  <div class="card"><div class="row"><input id="askQ" class="inp" placeholder="${canCost()?'e.g. What did we pay for 6 ft lathes?':'e.g. Where do we have 8 ft lathes?'}" enterkeyhint="send"><button id="askBtn" class="btn">Ask</button></div><div id="askA" class="answer"></div></div>
   ${recent.length?`<div class="h">Recently updated <button data-go="log">All moves</button></div><div class="grp">${recent.map(itemRow).join('')}</div>`:''}
   <div class="foot">TL Pathak Group · Think Machines, Think Us.${MODE==='sheet'?' · synced with your Google Sheet':''}</div>`;
 }
@@ -598,7 +599,7 @@ function renderList(){
   const el=$('#list');if(!el)return;const F=filtered();
   if(!F.length){el.innerHTML=`<div class="empty"><b>${S.items.length?'Nothing matches':'No stock yet'}</b>${S.items.length?'Try another search or location.':'Tap the red camera to snap your first machine.'}</div>`;return}
   const cats={};F.forEach(i=>{const c=i.category||'Other',g=groupOf(i);(cats[c]=cats[c]||{});(cats[c][g]=cats[c][g]||[]).push(i)});
-  const bt=isAdmin()?Object.fromEntries(buyTable().map(b=>[b.group,b])):{};
+  const bt=canCost()?Object.fromEntries(buyTable().map(b=>[b.group,b])):{};
   el.innerHTML=Object.keys(cats).sort((a,b)=>CATS.indexOf(a)-CATS.indexOf(b)).map(c=>{const gs=cats[c];const tot=Object.values(gs).flat().reduce((a,i)=>a+q(i),0);
     return `<div class="cat-h"><span>${esc(c)}</span><span class="num">${tot}</span></div>`+Object.entries(gs).sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(([g,arr])=>{
       const n=arr.reduce((a,i)=>a+q(i),0),per={};arr.forEach(i=>{const k=shortLoc(i.locationId);per[k]=(per[k]||0)+q(i)});const ph=arr.find(i=>i.photos&&i.photos[0]);const key=c+'|'+g;const b=bt[g];
@@ -608,8 +609,8 @@ function copyText(t,msg){try{navigator.clipboard.writeText(t).then(()=>toast(msg
 
 /* ---- snap ---- */
 function snapV(v){
-  const seg=`<div class="seg"><button data-smode="machine" class="${ui.snapMode==='machine'?'on':''}">📷 Machine</button><button data-smode="sale" class="${ui.snapMode==='sale'?'on':''}">Sales bill</button>${isAdmin()?`<button data-smode="inv" class="${ui.snapMode==='inv'?'on':''}">Purchase bill</button>`:''}</div>`;
-  if(ui.snapMode==='inv'&&isAdmin()){v.innerHTML=seg+invHTML();return}
+  const seg=`<div class="seg"><button data-smode="machine" class="${ui.snapMode==='machine'?'on':''}">📷 Machine</button><button data-smode="sale" class="${ui.snapMode==='sale'?'on':''}">Sales bill</button>${canCost()?`<button data-smode="inv" class="${ui.snapMode==='inv'?'on':''}">Purchase bill</button>`:''}</div>`;
+  if(ui.snapMode==='inv'&&canCost()){v.innerHTML=seg+invHTML();return}
   if(ui.snapMode==='sale'){v.innerHTML=seg+saleHTML();return}
   v.innerHTML=seg+machineHTML();
 }
@@ -719,7 +720,7 @@ async function saveInv(){
 
 /* ---- buy (admin) ---- */
 function buyV(v){
-  const modes=isAdmin()?[['sales','Sales'],['inv','Buys'],['lists','Lists'],['prices','Costs'],['clients','Clients']]:[['sales','Sales'],['clients','Clients']];
+  const modes=canCost()?[['sales','Sales'],['inv','Buys'],['lists','Lists'],['prices','Costs'],['clients','Clients']]:[['sales','Sales'],['clients','Clients']];
   if(!modes.some(m=>m[0]===ui.buyMode))ui.buyMode='sales';
   const seg=`<div class="seg">${modes.map(([k,l])=>`<button data-bmode="${k}" class="${ui.buyMode===k?'on':''}">${l}</button>`).join('')}</div>`;
   const t=ui.bq.toLowerCase().trim();
@@ -911,6 +912,7 @@ document.addEventListener('click',async e=>{
   if(t.id==='saveUser'){saveUser();return}
   if(d.resetpw){if(!t.dataset.sure){t.dataset.sure='1';t.textContent='Tap again to reset';return}try{const j=await SB.get({action:'resetPassword',email:d.resetpw});showTemp(d.resetpw,j.tempPassword,j.users)}catch(e){toast(e.message)}return}
   if(d.edituser){userForm(USERS.find(x=>x.email===d.edituser));return}
+  if(d.approve){try{const j=await SB.post({action:'saveUser',user:{email:d.approve,active:true}});USERS=j.users||USERS;toast('Approved ✓');renderUsers()}catch(e){toast(e.message)}return}
   if(t.id==='newUser'){userForm(null);return}
   if(t.id==='backUsers'){openUsers();return}
   if(t.id==='copyTemp'){copyText(t.dataset.msg,'Copied — send it on WhatsApp');return}
@@ -972,7 +974,7 @@ async function onSaleFiles(files){
   renderView();
   if(sale.photos.length&&canAutoAI())readSale();
 }
-for(const id of ['plPick','plCam'])$('#'+id).addEventListener('change',e=>{const f=e.target.files;if(f&&f.length){if(!isAdmin()){toast('Price lists are for admins');return}addPLFiles(f)}e.target.value=''});
+for(const id of ['plPick','plCam'])$('#'+id).addEventListener('change',e=>{const f=e.target.files;if(f&&f.length){if(!canCost()){toast('Price lists are for admins');return}addPLFiles(f)}e.target.value=''});
 for(const id of ['sPick','sCam'])$('#'+id).addEventListener('change',e=>{const f=e.target.files;if(f&&f.length)onSaleFiles(f);e.target.value=''});
 for(const id of ['iPick','iCam'])$('#'+id).addEventListener('change',e=>{const f=e.target.files;if(f&&f.length)onInvFiles(f);e.target.value=''});
 let matchKey='';
@@ -1026,7 +1028,7 @@ async function readSale(){
   }catch(e){sale.err=aiErr(e)}
   sale.busy=false;renderView();
 }
-function margin(line){if(!isAdmin()||!line.group)return null;const b=buyTable().find(x=>x.group===line.group);if(!b||!b.lastLanded||!num(line.rate))return null;const m=num(line.rate)-b.lastLanded;return {cost:b.lastLanded,m,pct:Math.round(m/num(line.rate)*100)}}
+function margin(line){if(!canCost()||!line.group)return null;const b=buyTable().find(x=>x.group===line.group);if(!b||!b.lastLanded||!num(line.rate))return null;const m=num(line.rate)-b.lastLanded;return {cost:b.lastLanded,m,pct:Math.round(m/num(line.rate)*100)}}
 function saleHTML(){
   if(!sale.active)return `<div class="card snap-hero">
       <label class="bigcam" for="sPick" style="background:var(--ok);box-shadow:0 12px 30px rgba(30,138,76,.35),0 0 0 10px var(--ok-l)" aria-label="Photograph sales invoice">${IC.sell.replace('<svg','<svg width="60" height="60"')}</label>
@@ -1117,7 +1119,7 @@ function salesV(v,head,t){
   const L=[...S.sales].sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.createdAt||0)-(a.createdAt||0)).filter(s=>!t||[s.client&&s.client.name,s.invoiceNo,s.client&&s.client.gstin,s.client&&s.client.phone,...(s.lines||[]).map(l=>l.desc+' '+l.group+' '+l.serial)].join(' ').toLowerCase().includes(t));
   const month=new Date().toISOString().slice(0,7),ms=S.sales.filter(s=>String(s.date).startsWith(month));
   const mt=ms.reduce((a,s)=>a+num(s.subtotal),0);
-  let mm='';if(isAdmin()){let m=0,has=false;ms.forEach(s=>(s.lines||[]).forEach(l=>{const g=margin(l);if(g){m+=g.m*num(l.qty);has=true}}));if(has)mm=`<div class="stat"><div class="v num" style="font-size:20px">${inr(m)}</div><div class="l">Margin this month <span class="lock">ADMIN</span></div></div>`}
+  let mm='';if(canCost()){let m=0,has=false;ms.forEach(s=>(s.lines||[]).forEach(l=>{const g=margin(l);if(g){m+=g.m*num(l.qty);has=true}}));if(has)mm=`<div class="stat"><div class="v num" style="font-size:20px">${inr(m)}</div><div class="l">Margin this month <span class="lock">ADMIN</span></div></div>`}
   v.innerHTML=head+`<div class="stats" style="grid-template-columns:1fr 1fr;margin-bottom:12px"><div class="stat hero"><div class="v num" style="font-size:20px">${inr(mt)}</div><div class="l">Sold this month (ex-GST)</div></div>${mm||`<div class="stat"><div class="v num">${ms.length}</div><div class="l">Bills this month</div></div>`}</div>
   <button class="btn block" data-gosale="1" style="margin-bottom:12px;background:var(--ok)">🧾 Snap a sales invoice</button>`+
   (L.length?L.map(s=>`<button class="inv" data-sale="${esc(s.id)}"><div class="th" style="${cssUrl((s.images||[])[0])}"></div><div class="tx"><b>${esc(s.client&&s.client.name||'Client')}</b><small>Inv ${esc(s.invoiceNo||'—')} · ${esc(fdate(s.date))} · ${esc(shortLoc(s.locationId))}</small><small>${esc((s.lines||[]).slice(0,2).map(l=>(l.qty>1?l.qty+' × ':'')+l.desc).join(', '))}</small></div><span class="rupee">${inr(s.total)}</span></button>`).join(''):`<div class="empty"><b>No sales recorded yet</b>Snap the invoice you gave a customer.</div>`);
@@ -1290,16 +1292,35 @@ function openPL(id){
 }
 
 /* ================= sign-in & users (Google Sheet version) ================= */
-let USERS=[];
+let USERS=[],USERS_LINKED=false;
 function authErr(e){if(e==='SIGNED_OUT'){signOut(true)}else if(e==='CHANGE_PASSWORD'){MODE='changepw';renderView()}}
-function signOut(expired){if(expired&&MODE==='login')return;CFG.session='';CFG.user=null;lsSet('tlp_sess','');lsSet('tlp_user','');S.loaded=false;MODE=CFG.api?'login':'none';closeSheet();setLive('setup');renderView();if(expired)toast('Please sign in again')}
+function signOut(expired){if(expired&&MODE==='login')return;if(!expired&&CFG.session&&lsGet('tlp_session_token')===CFG.session)lsSet('tlp_session_token','');CFG.session='';CFG.user=null;lsSet('tlp_sess','');lsSet('tlp_user','');S.loaded=false;MODE=CFG.api?'login':'none';closeSheet();setLive('setup');renderView();if(expired)toast('Please sign in again')}
 function startSheet(){MODE='sheet';S.loaded=false;renderView();if(!SB._started){SB._started=true;SB.init()}else SB.refresh(true)}
-function loginHTML(){return `<div class="card snap-hero" style="text-align:left"><div style="text-align:center"><div class="logo" style="width:64px;height:64px;font-size:30px;margin:4px auto 10px">TL</div><h2>Sign in</h2><p>TL Pathak Stock Live</p></div>
+let authView='login';
+function loginHTML(){
+  const head=`<div style="text-align:center"><div class="logo" style="width:64px;height:64px;font-size:30px;margin:4px auto 10px">TL</div><h2>${authView==='login'?'Sign in':'Register'}</h2><p>TL Pathak Stock Live${SB.linked?' · same login as the TL Pathak dashboard':''}</p></div>`;
+  if(authView==='done')return `<div class="card snap-hero">${head.replace('Register','Request sent')}<div class="ai-box ok" style="text-align:left"><div>✅</div><div>Your account request has been sent. You can sign in as soon as the admin approves it.</div></div><button class="btn block" onclick="authView='login';renderView()">Back to sign in</button></div>`;
+  if(authView==='register')return `<div class="card snap-hero" style="text-align:left">${head}
+  <form onsubmit="event.preventDefault();doRegister()"><label class="fld"><span>Full name</span><input class="inp" id="rName" autocomplete="name" placeholder="John Doe"></label>
+  <label class="fld"><span>Email</span><input class="inp" id="rEmail" type="email" autocomplete="username" autocapitalize="off" placeholder="yourname@tlp.com"></label>
+  <label class="fld"><span>Password (min 8 characters)</span><input class="inp" id="rPw" type="password" autocomplete="new-password"></label>
+  <div id="rErr" class="muted" style="color:var(--red);min-height:20px"></div>
+  <button class="btn block" id="btnRegister" type="submit" style="padding:14px;background:var(--ok)">Create account</button></form>
+  <p class="muted" style="text-align:center;margin-top:12px">Already have an account? <a href="#" onclick="event.preventDefault();authView='login';renderView()" style="color:var(--blue);font-weight:700">Sign in</a></p></div>`;
+  return `<div class="card snap-hero" style="text-align:left">${head}
   <form id="loginForm" onsubmit="event.preventDefault();doLogin()"><label class="fld"><span>Email</span><input class="inp" id="lEmail" type="email" autocomplete="username" value="${esc(lsGet('tlp_lastemail')||'')}" autocapitalize="off"></label>
   <label class="fld"><span>Password</span><input class="inp" id="lPw" type="password" autocomplete="current-password"></label>
   <div id="lErr" class="muted" style="color:var(--red);min-height:20px"></div>
   <button class="btn red block" id="btnLogin" type="submit" style="padding:14px">Sign in</button></form>
-  <div class="foot">Forgot your password? Ask Hitesh to reset it.<br><a href="#" onclick="event.preventDefault();openSettings()" style="color:var(--ink3)">Server link</a></div></div>`}
+  <p class="muted" style="text-align:center;margin-top:12px">Need an account? <a href="#" onclick="event.preventDefault();authView='register';renderView()" style="color:var(--blue);font-weight:700">Register here</a></p>
+  <div class="foot">Forgot your password? Ask the admin to reset it.<br><a href="#" onclick="event.preventDefault();openSettings()" style="color:var(--ink3)">Server link</a></div></div>`}
+async function doRegister(){
+  const name=$('#rName').value.trim(),email=$('#rEmail').value.trim(),pw=$('#rPw').value,err=$('#rErr'),btn=$('#btnRegister');
+  if(!name||!email||pw.length<8){err.textContent=!name?'Enter your name':!email?'Enter your email':'Password must be at least 8 characters';return}
+  btn.disabled=true;btn.textContent='Sending…';
+  try{const r=await fetch(CFG.api,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'register',name,email,password:pw})});const j=await r.json();if(!j.ok)throw new Error(j.error);lsSet('tlp_lastemail',email);authView='done';renderView()}
+  catch(e){err.textContent=e.message==='Failed to fetch'?'Can’t reach the server':e.message;btn.disabled=false;btn.textContent='Create account'}
+}
 function changePwHTML(){const first=CFG.user&&CFG.user.mustChange;return `<div class="card snap-hero" style="text-align:left"><h2 style="text-align:center">${first?'Choose your password':'Change password'}</h2><p style="text-align:center">${first?'You signed in with a temporary password. Pick your own — at least 8 characters.':'At least 8 characters.'}</p>
   <form onsubmit="event.preventDefault();doChangePw()"><label class="fld"><span>${first?'Temporary password':'Current password'}</span><input class="inp" id="cOld" type="password" autocomplete="current-password"></label>
   <label class="fld"><span>New password</span><input class="inp" id="cNew" type="password" autocomplete="new-password"></label>
@@ -1312,6 +1333,7 @@ async function doLogin(){
   try{const r=await fetch(CFG.api,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'login',email,password:pw})});const j=await r.json();
     if(!j.ok)throw new Error(j.error||'Sign-in failed');
     CFG.session=j.session;CFG.user=j.user;lsSet('tlp_sess',j.session);lsSet('tlp_user',JSON.stringify(j.user));lsSet('tlp_lastemail',email);
+    if(j.shared)lsSet('tlp_session_token',j.session); // also signs you in to the TL Pathak dashboard on this browser
     if(j.user.mustChange){MODE='changepw';renderView();return}
     if(!myLoc()&&j.user.location)lsSet('tlp_myloc',j.user.location);
     toast('Welcome, '+(j.user.name||email));startSheet();
@@ -1327,26 +1349,29 @@ async function doChangePw(){
 }
 async function openUsers(){
   openSheet('<div class="sh-t">Users</div><div class="empty"><div class="spin" style="margin:0 auto;color:var(--blue)"></div></div>');
-  try{const j=await SB.get({action:'users'});USERS=j.users||[];renderUsers()}catch(e){openSheet(`<div class="sh-t">Users</div><div class="ai-box err">${esc(e.message)}</div>`)}
+  try{const j=await SB.get({action:'users'});USERS=j.users||[];USERS_LINKED=!!j.linked;renderUsers()}catch(e){openSheet(`<div class="sh-t">Users</div><div class="ai-box err">${esc(e.message)}</div>`)}
 }
 function renderUsers(){
-  const R={admin:'Admin',staff:'Staff',viewer:'View only'};
-  openSheet(`<div class="sh-t">Users &amp; passwords</div><div class="sh-s">Admins see buy prices, purchase bills &amp; price lists. Staff snap, move and sell. View-only can just look.</div>
+  const R={admin:'Admin',staff:'Staff',viewer:'View only'};const pend=USERS.filter(u=>u.pending),rest=USERS.filter(u=>!u.pending);
+  const row=u=>`<div class="inv" style="cursor:default"><div class="tx"><b>${esc(u.name)}${u.active?'':u.noStock?' <span class="badge Reserved">no stock access</span>':' <span class="badge Sold">disabled</span>'}</b><small>${esc(u.email)} · ${R[u.role]||u.role}${u.cost&&u.role!=='admin'?' · sees buy prices':''}${u.location?' · '+esc(shortLoc(u.location)):''}</small><small>${u.mustChange?'Has not set a password yet':u.lastLogin?'Last stock sign-in '+esc(ago(u.lastLogin)):'Not signed in to stock yet'}</small></div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn ghost" style="padding:6px 10px;font-size:13px" data-edituser="${esc(u.email)}">Edit</button><button class="btn ghost" style="padding:6px 10px;font-size:13px" data-resetpw="${esc(u.email)}">Reset password</button></div></div>`;
+  openSheet(`<div class="sh-t">Users &amp; passwords</div><div class="sh-s">${USERS_LINKED?'<b>Same accounts as the TL Pathak dashboard app</b> — changes here apply there too. ':''}Admins manage everything. “Sees buy prices” shows purchase bills, price lists, costs &amp; margins. Staff snap, move and sell.</div>
+  ${pend.length?`<div class="h" style="margin-top:0">Waiting for approval (${pend.length})</div>${pend.map(u=>`<div class="inv" style="cursor:default;border-color:var(--warn)"><div class="tx"><b>${esc(u.name)}</b><small>${esc(u.email)}</small></div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn" style="padding:7px 12px;font-size:13px;background:var(--ok)" data-approve="${esc(u.email)}">Approve</button><button class="btn ghost" style="padding:6px 10px;font-size:13px" data-edituser="${esc(u.email)}">Options</button></div></div>`).join('')}<div class="h">Everyone</div>`:''}
   <button class="btn block" id="newUser" style="margin-bottom:12px">＋ Add a user</button>
-  ${USERS.map(u=>`<div class="inv" style="cursor:default"><div class="tx"><b>${esc(u.name)}${u.active?'':' <span class="badge Sold">disabled</span>'}</b><small>${esc(u.email)} · ${R[u.role]||u.role}${u.location?' · '+esc(shortLoc(u.location)):''}</small><small>${u.mustChange?'Has not set a password yet':u.lastLogin?'Last sign-in '+esc(ago(u.lastLogin)):'Never signed in'}</small></div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn ghost" style="padding:6px 10px;font-size:13px" data-edituser="${esc(u.email)}">Edit</button><button class="btn ghost" style="padding:6px 10px;font-size:13px" data-resetpw="${esc(u.email)}">Reset password</button></div></div>`).join('')}`);
+  ${rest.map(row).join('')}`);
 }
 function userForm(u){
   const n=!u;u=u||{role:'staff',active:true,location:myLoc()};
   openSheet(`<div class="sh-t">${n?'Add a user':'Edit '+esc(u.name)}</div><div class="sh-s">${n?'A temporary password is created — you send it to them; they choose their own at first sign-in.':esc(u.email)}</div>
   ${n?`<label class="fld"><span>Email</span><input class="inp" id="uEmail" type="email" autocapitalize="off"></label>`:`<input type="hidden" id="uEmail" value="${esc(u.email)}">`}
   <label class="fld"><span>Name</span><input class="inp" id="uName" value="${esc(u.name||'')}" placeholder="e.g. Ravi Kumar"></label>
-  <div class="grid2"><label class="fld"><span>Role</span><select class="sel" id="uRole"><option value="staff" ${u.role==='staff'?'selected':''}>Staff</option><option value="admin" ${u.role==='admin'?'selected':''}>Admin</option><option value="viewer" ${u.role==='viewer'?'selected':''}>View only</option></select></label>
+  <div class="grid2"><label class="fld"><span>Role</span><select class="sel" id="uRole"><option value="staff" ${u.role==='staff'?'selected':''}>Staff</option><option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>${USERS_LINKED?'':`<option value="viewer" ${u.role==='viewer'?'selected':''}>View only</option>`}</select></label>
   <label class="fld"><span>Branch</span><select class="sel" id="uLoc">${locOptions(u.location||'','Any')}</select></label></div>
-  ${n?'':`<label class="chk" style="margin-bottom:12px"><input type="checkbox" id="uActive" ${u.active?'checked':''}> Account active (untick to block sign-in)</label>`}
+  <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="uCost" ${u.cost||u.role==='admin'?'checked':''}> Sees buy prices, purchase bills &amp; price lists</label>
+  ${n?'':`<label class="chk" style="margin-bottom:12px"><input type="checkbox" id="uActive" ${u.active||u.pending||u.noStock?'checked':''}> ${u.pending?'Approve this account':'Account active (untick to block sign-in)'}</label>`}
   <button class="btn block" id="saveUser">${n?'Create user':'Save'}</button><button class="btn ghost block" style="margin-top:8px" id="backUsers">Back</button>`);
 }
 async function saveUser(){
-  const user={email:$('#uEmail').value.trim(),name:$('#uName').value.trim(),role:$('#uRole').value,location:$('#uLoc').value,active:$('#uActive')?$('#uActive').checked:true};
+  const user={email:$('#uEmail').value.trim(),name:$('#uName').value.trim(),role:$('#uRole').value,location:$('#uLoc').value,cost:$('#uCost').checked,active:$('#uActive')?$('#uActive').checked:true};
   if(!user.email){toast('Email needed');return}
   try{const j=await SB.post({action:'saveUser',user});USERS=j.users||USERS;if(j.tempPassword)showTemp(user.email,j.tempPassword,j.users);else{toast('Saved ✓');renderUsers()}}catch(e){toast(e.message)}
 }
@@ -1369,6 +1394,10 @@ renderView();
   if(typeof window.claude==='undefined'||!window.claude||!window.claude.use){
     // On GitHub Pages: read the server link from config.json so people only sign in
     if(!CFG.api){try{const r=await fetch('config.json',{cache:'no-store'});const c=await r.json();if(c&&c.apiUrl){CFG.api=c.apiUrl;lsSet('tlp_api',CFG.api)}}catch(e){}}
+    if(CFG.api){try{const m=await (await fetch(CFG.api+(CFG.api.includes('?')?'&':'?')+'action=mode',{redirect:'follow'})).json();SB.linked=!!(m&&m.linked)}catch(e){}
+      // already signed in to the TL Pathak dashboard on this browser? use that sign-in
+      const dash=lsGet('tlp_session_token');
+      if(dash&&!CFG.session){try{const r=await fetch(CFG.api+(CFG.api.includes('?')?'&':'?')+new URLSearchParams({action:'me',session:dash}),{redirect:'follow'});const j=await r.json();if(j.ok){CFG.session=dash;CFG.user=j.user;lsSet('tlp_sess',dash);lsSet('tlp_user',JSON.stringify(j.user));toast('Signed in as '+j.user.name);startSheet();return}}catch(e){}}}
     MODE=CFG.api?'login':'none';setLive('setup');renderView();return}
   const db=await window.claude.use('db');
   if(!db){MODE='none';setLive('setup');banner('Open this page signed in to Claude to see live stock.');renderView();return}

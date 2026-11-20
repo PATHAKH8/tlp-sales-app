@@ -9,23 +9,39 @@ Stock is saved in your TL Pathak Google Sheet as three new tabs: **Stock**, **St
 3. **Project Settings → Script properties**:
    | Property | Value |
    |---|---|
-   | *(no keys needed for sign-in)* | `setup()` creates the admin account **pathakh@gmail.com** and prints a **one-time password** in the Execution log (View → Logs). |
-   | | Lost the admin password? Run `resetAdminPassword()`; it prints a new one-time password. |
+   | `APP_SHEET_ID`, `APP_TOKEN_SECRET` | To share the dashboard's logins (see section 2). |
    | `GEMINI_KEY` | Your Gemini API key. It's used for photo reading and Ask the stock, and stays on the server. |
    | `GEMINI_MODEL` | Optional. Default is `gemini-3.8-flash`. Use any current free-tier model id from ai.google.dev/pricing. |
 4. **Deploy → New deployment → Web app** → Execute as **Me** → Who has access **Anyone** → copy the `/exec` URL.
    After any later code change: **Deploy → Manage deployments → Edit → New version**. The URL stays the same.
 
-## 2. Stock app (staff phones)
-1. The app lives in this repo's `stock/` folder, so GitHub Pages serves it at **https://pathakh8.github.io/tlp-sales-app/stock/**. Paste your `/exec` URL into `stock/config.json`, and everyone just sees the sign-in screen. The link is safe to keep in this public repo. Never put passwords there.
-2. Sign in as **pathakh@gmail.com** with the one-time password, then choose your own password (at least 8 characters).
-3. **⚙ → Users & passwords → Add a user** for each person (email, name, role, branch). The app shows a temporary password once. Send it on WhatsApp, and they choose their own password when they first sign in.
-   - **Admin:** sees buy prices, purchase bills, price lists and margins, and manages users and locations.
-   - **Staff:** snaps machines, moves and sells stock, and records sales bills.
-   - **View only:** can only look.
-   Untick **Account active** to block someone instantly, or use **Reset password** if they forget theirs.
-4. Optional: **Places → Staff setup link** gives a link that opens the app with a branch already chosen. Staff still sign in with their own email and password.
-   Tip: on the phone, use "Add to Home screen" so it opens like an app.
+## 2. Logins — same accounts as the TL Pathak dashboard (recommended)
+The stock app can use the **same Users tab** as your dashboard / sales app. Same email, same password, same "Register here → admin approves" flow.
+1. Open the dashboard's Google Sheet (**TL Pathak App Data**) and copy its ID from the URL (the long part between `/d/` and `/edit`).
+2. Open the dashboard's Apps Script → **Project Settings → Script properties** and copy the value of `TOKEN_SECRET`.
+3. In the **stock** Apps Script → **Script properties**, add:
+   | Property | Value |
+   |---|---|
+   | `APP_SHEET_ID` | the dashboard sheet ID from step 1 |
+   | `APP_TOKEN_SECRET` | the `TOKEN_SECRET` value from step 2 |
+4. Run `setup()` again. It makes sure **pathakh@gmail.com** is an admin there. Sign in with your **dashboard password**.
+
+How it works after that:
+- **One sign-in for both apps.** Anyone signed in to the dashboard on a phone opens the stock app already signed in, and the other way round.
+- **New people:** they tap **Register here** in either app, and you approve them in the dashboard's Users tab or in the stock app (**⚙ → Users & passwords → Approve**).
+- **Who sees what:**
+  - **Admin** (dashboard role "admin") manages everything.
+  - **"Sees buy prices"** (the dashboard's `can_view_cost` tick) shows purchase bills, price lists, costs and margins.
+  - Everyone else snaps machines, moves and sells stock, and records sales bills.
+- **Access lists:** if a dashboard user has an `access` list (for example `finder,quotes`), add `stock` to it to let them in. Approving or saving them in the stock app does this for you.
+- **Passwords:** password resets from the stock app give a one-time password, and the person picks a new one at first sign-in. The new password then works in the dashboard too.
+
+*(Standalone, without `APP_SHEET_ID`: accounts live in the stock sheet's **Stock_Users** tab. `setup()` prints a one-time password for pathakh@gmail.com in View → Logs. Registration and approval work the same way.)*
+
+## 2b. Stock app on phones
+- The app is at **https://pathakh8.github.io/tlp-sales-app/stock/**.
+- Put your stock `/exec` link in `stock/config.json` (safe in this public repo; never put passwords there).
+- On the phone, use "Add to Home screen" so it opens like an app.
 
 ## 3. Link it into the dashboard
 Paste `stock-widget.js` into the dashboard: as a `<script src>`, or the whole file inside a `<script>` tag in single-file HTML. Then:
