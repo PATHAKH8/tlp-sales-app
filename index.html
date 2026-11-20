@@ -293,6 +293,9 @@
                     <button id="nav-leads" onclick="showTab('leads')" class="w-full flex items-center px-4 py-3.5 text-sm font-medium rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition duration-150 min-h-[44px]">
                         <i data-lucide="scan-line" class="mr-3 h-5 w-5"></i> Scan card / notes
                     </button>
+                    <button id="nav-imleads" onclick="showTab('imleads')" class="w-full flex items-center px-4 py-3.5 text-sm font-medium rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition duration-150 min-h-[44px]">
+                        <i data-lucide="inbox" class="mr-3 h-5 w-5"></i> IndiaMART leads <span id="im-badge" class="ml-auto hidden bg-rose-600 text-white text-[11px] font-bold rounded-full px-2 py-0.5"></span>
+                    </button>
                     <button id="nav-clients" onclick="showTab('clients')" class="w-full flex items-center px-4 py-3.5 text-sm font-medium rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition duration-150 min-h-[44px]">
                         <i data-lucide="users" class="mr-3 h-5 w-5"></i> Clients
                     </button>
@@ -493,6 +496,23 @@
                 </section>
 
                 <!-- Clients -->
+                <section id="tab-imleads" class="hidden space-y-4 max-w-6xl mx-auto">
+                    <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+                        <div class="flex items-start gap-3"><div class="flex-1"><h2 class="text-base sm:text-lg font-extrabold text-slate-900">My IndiaMART leads</h2>
+                        <p id="im-status" class="text-xs text-slate-500 mt-1">Enquiries, calls and bought BuyLeads assigned to you by the Lead Hub.</p></div>
+                        <button onclick="tlpImLoad()" class="text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-50">Refresh</button></div>
+                        <div id="im-connect" class="hidden mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-900">
+                            <b>Connect your leads:</b> open the personal link the Lead Hub sent you on WhatsApp (it ends with <code>#imleads</code>). Or paste your key here:
+                            <div class="flex gap-2 mt-2"><input id="im-key" placeholder="Your Lead Hub key" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm"><button onclick="tlpImConnect()" class="bg-blue-600 text-white text-sm font-semibold rounded-lg px-4">Connect</button></div>
+                        </div>
+                        <div class="flex gap-2 mt-3 flex-wrap">
+                            <input id="im-search" type="search" placeholder="Search name, product, city" oninput="tlpImRender()" class="flex-1 min-w-[180px] border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                            <select id="im-filter" onchange="tlpImRender()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"><option value="open">Open (not won/lost)</option><option>New</option><option>Contacted</option><option>Follow-up</option><option>Quoted</option><option>Negotiation</option><option>Won</option><option>Lost</option><option value="due">Follow-up due</option><option value="all">All</option></select>
+                            <select id="im-owner" onchange="tlpImRender()" class="hidden border border-slate-300 rounded-lg px-3 py-2 text-sm"></select>
+                        </div>
+                    </div>
+                    <div id="im-list" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
+                </section>
                 <section id="tab-clients" class="hidden space-y-4 max-w-6xl mx-auto">
                     <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
                         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1073,7 +1093,7 @@
         function showTab(tabId) {
             activeTab = tabId;
             
-            ['dashboard', 'finder', 'leads', 'clients', 'admin'].forEach(tab => {
+            ['dashboard', 'finder', 'leads', 'imleads', 'clients', 'admin'].forEach(tab => {
                 const element = document.getElementById(`tab-${tab}`);
                 const navBtn = document.getElementById(`nav-${tab}`);
                 if (element) element.classList.add('hidden');
@@ -1093,7 +1113,7 @@
 
             const titleEl = document.getElementById('current-tab-title');
             if (titleEl) {
-                titleEl.innerText = tabId === 'dashboard' ? 'Products' : tabId === 'finder' ? 'Smart Product Finder' : tabId === 'leads' ? 'Scan card / notes' : tabId === 'clients' ? 'Clients' : 'Admin';
+                titleEl.innerText = tabId === 'dashboard' ? 'Products' : tabId === 'finder' ? 'Smart Product Finder' : tabId === 'leads' ? 'Scan card / notes' : tabId === 'imleads' ? 'IndiaMART leads' : tabId === 'clients' ? 'Clients' : 'Admin';
             }
             document.getElementById('top-search-bar').classList.toggle('hidden', tabId !== 'dashboard');
 
@@ -1104,6 +1124,8 @@
                 const q=document.getElementById('finder-tab-query'); if(q) setTimeout(()=>q.focus(),50);
             } else if (tabId === 'leads') {
                 tlpRenderLeads();
+            } else if (tabId === 'imleads') {
+                tlpImLoad();
             } else if (tabId === 'admin') {
                 renderAdminCatalogList();
                 renderUploadedFilesList();
@@ -7267,6 +7289,84 @@ async function qpPreview() {
 }
 document.addEventListener('input', e => { if (e.target && e.target.closest && e.target.closest('#quotepdf-modal') && /^qp-(qty|rate|extras)$/.test(e.target.id || '')) qpUpdateTotals(); });
 
+</script>
+
+<script>
+/* ===== IndiaMART leads from the TL Pathak Lead Hub (each salesperson's personal key; managers see all) ===== */
+const TLP_HUB = 'https://script.google.com/macros/s/AKfycbx0b0hQGUpDpiAg711Rt6_ipyiqegwQnpDBAdjmvYsN61khQgNoRITGIglfx9jnWQuSFQ/exec';
+let tlpIm = { leads: [], me: null, at: 0 };
+(function () { // personal link: ...?hubkey=XXXX#imleads → remember the key, clean the address bar
+  try { const p = new URLSearchParams(location.search), k = p.get('hubkey');
+    if (k) { localStorage.setItem('tlp_hubkey', k); p.delete('hubkey'); history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : '') + location.hash); }
+    if (location.hash === '#imleads') { let n = 0; const t = setInterval(() => { n++; if (typeof currentUser !== 'undefined' && currentUser) { clearInterval(t); showTab('imleads'); } else if (n > 120) clearInterval(t); }, 500); }
+  } catch (e) {}
+  setTimeout(() => { if (localStorage.getItem('tlp_hubkey')) tlpImLoad(true); }, 4000);
+  setInterval(() => { if (localStorage.getItem('tlp_hubkey') && !document.hidden) tlpImLoad(true); }, 5 * 60000);
+})();
+function imEsc(v) { return String(v == null ? '' : v).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c])); }
+async function tlpImCall(body) {
+  const r = await fetch(TLP_HUB, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+  return r.json();
+}
+function tlpImConnect() { const k = document.getElementById('im-key').value.trim(); if (!k) return; localStorage.setItem('tlp_hubkey', k); tlpImLoad(); }
+async function tlpImLoad(quiet) {
+  const key = localStorage.getItem('tlp_hubkey'); const st = document.getElementById('im-status'), con = document.getElementById('im-connect');
+  if (!key) { if (con) con.classList.remove('hidden'); if (st) st.textContent = 'Not connected yet.'; return; }
+  if (!quiet && st) st.textContent = 'Loading your leads…';
+  try {
+    const r = await tlpImCall({ action: 'myLeads', key });
+    if (!r.ok) { if (con) con.classList.remove('hidden'); if (st) st.textContent = r.msg || 'Could not load leads.'; return; }
+    if (con) con.classList.add('hidden');
+    tlpIm = { leads: r.leads || [], me: r.me, team: r.team || [], at: Date.now() };
+    const own = document.getElementById('im-owner');
+    if (own) { own.classList.toggle('hidden', !r.me.seeAll); if (r.me.seeAll) { const cur = own.value; own.innerHTML = '<option value="">Everyone</option>' + tlpIm.team.map(n => `<option ${n === cur ? 'selected' : ''}>${imEsc(n)}</option>`).join('') + '<option value="Unassigned">Unassigned</option>'; } }
+    const nNew = tlpIm.leads.filter(l => l.status === 'New').length; const b = document.getElementById('im-badge');
+    if (b) { b.textContent = nNew; b.classList.toggle('hidden', !nNew); }
+    if (st) st.textContent = (r.me.seeAll ? 'All team leads' : 'Leads assigned to ' + r.me.name) + ' · ' + tlpIm.leads.length + ' in the last 4 months · updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    tlpImRender();
+  } catch (e) { if (st) st.textContent = 'Could not reach the Lead Hub — check your internet and tap Refresh.'; }
+}
+function tlpImRender() {
+  const el = document.getElementById('im-list'); if (!el) return;
+  const q = (document.getElementById('im-search').value || '').toLowerCase(), f = document.getElementById('im-filter').value, ow = (document.getElementById('im-owner') || {}).value || '';
+  const today = new Date().toISOString().slice(0, 10);
+  const L = tlpIm.leads.filter(l => (f === 'all' || (f === 'open' ? ['Won', 'Lost'].indexOf(l.status) < 0 : f === 'due' ? (l.followUp && l.followUp <= today && ['Won', 'Lost'].indexOf(l.status) < 0) : l.status === f))
+    && (!ow || (l.owner || 'Unassigned') === ow)
+    && (!q || [l.name, l.company, l.product, l.city, l.state, l.mobile, l.message].join(' ').toLowerCase().includes(q)));
+  const tierCol = { Hot: 'bg-rose-600', Warm: 'bg-amber-500', Cold: 'bg-blue-500', Junk: 'bg-slate-400' };
+  const STS = ['New', 'Contacted', 'Follow-up', 'Quoted', 'Negotiation', 'Won', 'Lost'];
+  el.innerHTML = L.map(l => { const d = String(l.mobile || '').replace(/\D/g, ''); const intl = d.length === 10 ? '91' + d : d;
+    const hi = encodeURIComponent('Dear ' + (l.name || 'Sir') + ', this is ' + ((typeof currentUser !== 'undefined' && currentUser && currentUser.name) || 'TL Pathak Group') + ' from TL Pathak Group regarding your enquiry for ' + (l.product || 'machines') + ' on IndiaMART.');
+    return `<div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+      <div class="flex items-start gap-3"><div class="${tierCol[l.tier] || 'bg-slate-400'} text-white font-extrabold rounded-xl w-11 h-11 flex items-center justify-center shrink-0">${imEsc(l.score)}</div>
+      <div class="flex-1 min-w-0"><div class="font-bold text-slate-900">${imEsc(l.product || 'Enquiry')}</div>
+      <div class="text-sm text-slate-700">${imEsc(l.name)}${l.company ? ' · ' + imEsc(l.company) : ''}</div>
+      <div class="text-xs text-slate-500 mt-0.5">📍 ${imEsc([l.city, l.state].filter(Boolean).join(', '))} · ${imEsc(l.typeName)} · ${imEsc(l.account)} · ${imEsc(String(l.time).slice(0, 16))}${tlpIm.me && tlpIm.me.seeAll ? ' · 👤 ' + imEsc(l.owner || 'Unassigned') : ''}</div></div></div>
+      ${l.message ? `<div class="text-xs text-slate-600 bg-slate-50 rounded-lg p-2 mt-2 whitespace-pre-line max-h-28 overflow-auto">${imEsc(l.message)}</div>` : ''}
+      <div class="grid grid-cols-2 gap-2 mt-3">
+        <select onchange="tlpImSave('${imEsc(l.id)}',{status:this.value})" class="border border-slate-300 rounded-lg px-2 py-2 text-sm">${STS.map(s => `<option ${s === l.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        <input type="date" value="${imEsc(l.followUp)}" onchange="tlpImSave('${imEsc(l.id)}',{followUp:this.value,status:'Follow-up'})" class="border border-slate-300 rounded-lg px-2 py-2 text-sm" title="Follow-up date">
+      </div>
+      <textarea placeholder="Notes (saved when you leave the box)" onchange="tlpImSave('${imEsc(l.id)}',{notes:this.value})" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm mt-2">${imEsc(l.notes)}</textarea>
+      <div class="flex gap-2 mt-2 flex-wrap">
+        ${d ? `<a href="tel:+${intl}" class="flex-1 text-center bg-rose-600 text-white text-sm font-semibold rounded-lg py-2">📞 Call</a><a target="_blank" href="https:\/\/wa.me/${intl}?text=${hi}" class="flex-1 text-center bg-emerald-600 text-white text-sm font-semibold rounded-lg py-2">WhatsApp</a>` : ''}
+        ${l.email ? `<a href="mailto:${imEsc(l.email)}" class="flex-1 text-center border border-slate-300 text-sm font-semibold rounded-lg py-2">Email</a>` : ''}
+        <button onclick="tlpImQuote('${imEsc(l.id)}')" class="flex-1 bg-blue-600 text-white text-sm font-semibold rounded-lg py-2">Make quote</button>
+      </div>${l.lastAction ? `<div class="text-[11px] text-slate-400 mt-2">${imEsc(l.lastAction)}</div>` : ''}</div>`; }).join('') || '<div class="text-sm text-slate-500 text-center py-10 col-span-full">No leads here.</div>';
+  if (window.lucide) lucide.createIcons();
+}
+async function tlpImSave(id, fields) {
+  const key = localStorage.getItem('tlp_hubkey'); const l = tlpIm.leads.find(x => String(x.id) === String(id)); if (l) Object.assign(l, fields);
+  try { const r = await tlpImCall({ action: 'myLeadUpdate', key, id, fields }); showNotification(r.ok ? 'Saved' : (r.msg || 'Not saved'), r.ok ? 'success' : 'error'); }
+  catch (e) { showNotification('Not saved — no connection', 'error'); }
+  tlpImRender();
+}
+function tlpImQuote(id) {
+  const l = tlpIm.leads.find(x => String(x.id) === String(id)); if (!l) return;
+  tlpLeadToQuote({ id: 'local-im-' + l.id, company: l.company, name: l.name, phone: l.mobile, email: l.email, address: [l.city, l.state].filter(Boolean).join(', '),
+    requirement: (l.product || '') + (l.message ? ' — ' + String(l.message).slice(0, 200) : '') });
+  if (['New', 'Contacted', 'Follow-up'].indexOf(l.status) >= 0) tlpImSave(id, { status: 'Quoted' });
+}
 </script>
 </body>
 </html>
