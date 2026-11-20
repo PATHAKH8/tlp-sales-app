@@ -1,0 +1,42 @@
+# Pushes stock/apps-script/ to Google Apps Script and redeploys the SAME web-app URL
+# whenever StockAPI.gs changes on main. Skips quietly until the 3 secrets below are added.
+#   CLASPRC_JSON        – contents of ~/.clasprc.json after running `clasp login` once on your computer
+#   STOCK_SCRIPT_ID     – Apps Script project ID (Project Settings → IDs)
+#   STOCK_DEPLOYMENT_ID – the web-app deployment ID (Deploy → Manage deployments)
+# Use a separate Apps Script project for the stock app — clasp replaces every file in the project.
+name: Deploy stock Apps Script
+on:
+  push:
+    branches: [main]
+    paths: ['stock/apps-script/**']
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets
+        id: chk
+        env:
+          A: ${{ secrets.CLASPRC_JSON }}
+          B: ${{ secrets.STOCK_SCRIPT_ID }}
+          C: ${{ secrets.STOCK_DEPLOYMENT_ID }}
+        run: |
+          if [ -n "$A" ] && [ -n "$B" ] && [ -n "$C" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; else echo "Secrets not set yet — skipping Apps Script deploy."; fi
+      - uses: actions/checkout@v4
+        if: steps.chk.outputs.ok == '1'
+      - uses: actions/setup-node@v4
+        if: steps.chk.outputs.ok == '1'
+        with: { node-version: '20' }
+      - name: Push and redeploy
+        if: steps.chk.outputs.ok == '1'
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.STOCK_SCRIPT_ID }}
+          DEPLOYMENT_ID: ${{ secrets.STOCK_DEPLOYMENT_ID }}
+        run: |
+          npm i -g @google/clasp@2
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+          cd stock/apps-script
+          printf '{"scriptId":"%s","rootDir":"."}' "$SCRIPT_ID" > .clasp.json
+          clasp push -f
+          clasp deploy -i "$DEPLOYMENT_ID" -d "Auto deploy ${GITHUB_SHA::7}"

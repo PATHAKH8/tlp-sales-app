@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TL Pathak Stock Live</title>
+<meta name="theme-color" content="#0D2F6E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#1446A0;--blue-d:#0D2F6E;--blue-l:#E7EEFA;
+  --red:#D7262E;--red-d:#A9191F;--red-l:#FCE9EA;
+  --ink:#15181D;--ink2:#4A515C;--ink3:#8A919C;
+  --bg:#F2F3EF;--card:#FFFFFF;--line:#E1E3DD;
+  --ok:#1E8A4C;--ok-l:#E4F4EA;--warn:#B66A00;--warn-l:#FDF1DD;--tr:#5B3FB8;--tr-l:#EEE9FB;
+  --r:14px;
+  --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Barlow,system-ui,sans-serif;font-size:16px}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+input,select,textarea{font:inherit;color:inherit}
+.num{font-family:"JetBrains Mono",monospace;font-weight:700;letter-spacing:-.02em}
+.cond{font-family:"Barlow Condensed",sans-serif;letter-spacing:.02em}
+
+/* header */
+.top{position:sticky;top:0;z-index:20;background:var(--blue-d);color:#fff;padding:calc(10px + var(--st)) 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:38px;height:38px;border-radius:9px;background:#fff;color:var(--red);display:grid;place-items:center;font:700 19px "Barlow Condensed";letter-spacing:-.02em;flex:none;box-shadow:inset 0 -4px 0 var(--blue)}
+.bn{font:700 17px "Barlow Condensed";letter-spacing:.06em;line-height:1}
+.bs{font-size:12.5px;opacity:.85;display:flex;align-items:center;gap:6px;margin-top:3px}
+.dot{width:8px;height:8px;border-radius:50%;background:#999;display:inline-block}
+.dot.on{background:#3DDC84;box-shadow:0 0 0 3px rgba(61,220,132,.25);animation:pulse 2s infinite}
+.dot.off{background:var(--red)}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(61,220,132,0)}}
+.locchip{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:7px 12px;font-size:13.5px;font-weight:600;color:#fff;max-width:48vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+main{max-width:780px;margin:0 auto;padding:14px 14px calc(110px + var(--sb))}
+#banner:empty{display:none}
+#banner{max-width:780px;margin:10px auto 0;padding:0 14px}
+.bnr{background:var(--warn-l);color:#6b3e00;border-radius:10px;padding:10px 12px;font-size:14px}
+
+/* tabs */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:6px 6px calc(6px + var(--sb));max-width:780px;margin:0 auto}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:11.5px;font-weight:600;color:var(--ink3)}
+.tab svg{width:23px;height:23px}
+.tab.act{color:var(--blue)}
+.tab.snapbtn{position:relative}
+.tab.snapbtn .ring{width:58px;height:58px;margin-top:-26px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;box-shadow:0 6px 18px rgba(215,38,46,.4),0 0 0 5px #fff}
+.tab.snapbtn .ring svg{width:27px;height:27px}
+.tab.snapbtn.act{color:var(--red)}
+
+/* cards */
+.card{background:var(--card);border-radius:var(--r);padding:14px;border:1px solid var(--line);margin-bottom:12px}
+.h{font:700 13px "Barlow Condensed";letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);margin:18px 2px 8px;display:flex;justify-content:space-between;align-items:center}
+.h:first-child{margin-top:4px}
+.h a,.h button{font:600 13px Barlow;letter-spacing:0;text-transform:none;color:var(--blue);text-decoration:none}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:560px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.stat .v{font-size:28px;line-height:1.1}
+.stat .l{font-size:13px;color:var(--ink2);margin-top:2px}
+.stat.hero{background:var(--blue);color:#fff;border-color:var(--blue)}
+.stat.hero .l{color:#cfdcf5}
+
+.cta{display:flex;align-items:center;gap:14px;background:linear-gradient(120deg,var(--red),#B51C24);color:#fff;border-radius:var(--r);padding:16px;margin:12px 0;width:100%;text-align:left}
+.cta .ic{width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,.16);display:grid;place-items:center;flex:none}
+.cta b{font:700 21px "Barlow Condensed";letter-spacing:.02em;display:block}
+.cta span{font-size:14px;opacity:.9}
+
+.bar-row{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:center;width:100%;text-align:left}
+.bar-row:last-child{border-bottom:0}
+.bar-row .nm{font-weight:600;font-size:15px;display:flex;align-items:center;gap:6px;min-width:0}
+.bar-row .nm span.t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{grid-column:1/-1;height:6px;border-radius:3px;background:#EEF0EA;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--blue);border-radius:3px}
+.tag{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:var(--blue-l);color:var(--blue);flex:none}
+.tag.wh{background:#ECEDE6;color:#585E52}
+
+/* chips & inputs */
+.search{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:0 12px;margin-bottom:10px}
+.search input{flex:1;border:0;outline:0;padding:12px 0;background:none;font-size:16px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:7px 12px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:13.5px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.row{display:flex;gap:8px;align-items:center}
+.sel{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234A515C' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat right 12px center;border:1px solid var(--line);border-radius:10px;padding:10px 32px 10px 12px;font-size:15px;width:100%}
+.fld{display:block;margin-bottom:10px}
+.fld>span{display:block;font-size:12.5px;font-weight:600;color:var(--ink2);margin:0 0 4px 2px}
+.inp{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:16px;background:#fff;outline:0}
+.inp:focus,.sel:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
+textarea.inp{min-height:70px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border-radius:11px;font-weight:700;font-size:15.5px;background:var(--blue);color:#fff}
+.btn.red{background:var(--red)}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.soft{background:var(--blue-l);color:var(--blue)}
+.btn.block{width:100%}
+.btn:disabled{opacity:.5}
+.stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
+.stepper button{width:44px;height:44px;font-size:22px;font-weight:700;color:var(--blue)}
+.stepper input{width:56px;text-align:center;border:0;outline:0;font:700 18px "JetBrains Mono";background:none}
+
+/* group list */
+.cat-h{font:700 15px "Barlow Condensed";letter-spacing:.08em;text-transform:uppercase;color:var(--blue-d);margin:16px 2px 8px;display:flex;justify-content:space-between}
+.grp{background:#fff;border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px;overflow:hidden}
+.grp-h{display:flex;align-items:center;gap:12px;padding:12px;width:100%;text-align:left}
+.grp-h .th{width:52px;height:52px;border-radius:10px;background:#EEF0EA center/cover;flex:none;display:grid;place-items:center;color:var(--ink3)}
+.grp-h .tx{flex:1;min-width:0}
+.grp-h .tx b{display:block;font-size:16px;line-height:1.2}
+.grp-h .tx small{display:block;font-size:12.5px;color:var(--ink2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grp-h .ct{text-align:right}
+.grp-h .ct .num{font-size:22px;color:var(--blue)}
+.grp-h .ct small{display:block;font-size:11px;color:var(--ink3)}
+.grp-b{border-top:1px solid var(--line);background:#FAFBF8}
+.it{display:flex;gap:10px;align-items:center;padding:10px 12px;width:100%;text-align:left;border-bottom:1px solid var(--line)}
+.it:last-child{border-bottom:0}
+.it .th{width:40px;height:40px;border-radius:8px;background:#E8EAE3 center/cover;flex:none}
+.it .tx{flex:1;min-width:0;font-size:14px}
+.it .tx b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .tx small{color:var(--ink2)}
+.badge{font-size:11px;font-weight:700;padding:3px 7px;border-radius:6px;white-space:nowrap;background:var(--ok-l);color:var(--ok)}
+.badge.Reserved{background:var(--warn-l);color:var(--warn)}
+.badge.In-transit{background:var(--tr-l);color:var(--tr)}
+.badge.Demo{background:var(--blue-l);color:var(--blue)}
+.badge.Sold{background:#ECEDE6;color:#6c7166}
+.qty{font:700 15px "JetBrains Mono";min-width:34px;text-align:right}
+
+/* snap */
+.snap-hero{text-align:center;padding:26px 16px 22px}
+.bigcam{width:150px;height:150px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;margin:8px auto 14px;box-shadow:0 12px 30px rgba(215,38,46,.35),0 0 0 10px var(--red-l)}
+.bigcam svg{width:60px;height:60px}
+.snap-hero h2{font:700 28px "Barlow Condensed";margin:6px 0 4px;letter-spacing:.01em}
+.snap-hero p{color:var(--ink2);margin:0 0 18px;font-size:15px;line-height:1.45}
+.photos{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px}
+.ph{width:96px;height:96px;border-radius:12px;background:#ddd center/cover;flex:none;position:relative}
+.ph button{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:1}
+.ph.add{background:#fff;border:2px dashed var(--line);display:grid;place-items:center;color:var(--ink3);font-size:12px;font-weight:600;text-align:center}
+.ai-box{border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14.5px;display:flex;gap:10px;align-items:flex-start}
+.ai-box.busy{background:var(--blue-l);color:var(--blue-d)}
+.ai-box.ok{background:var(--ok-l);color:#155c34}
+.ai-box.lo{background:var(--warn-l);color:#6b3e00}
+.ai-box.err{background:var(--red-l);color:var(--red-d)}
+.spin{width:18px;height:18px;border:2.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;flex:none;margin-top:1px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.spec{display:grid;grid-template-columns:1fr 1.3fr 32px;gap:6px;margin-bottom:6px}
+.spec .inp{padding:8px 10px;font-size:15px}
+.spec button{color:var(--ink3);font-size:20px}
+.match{background:var(--blue-l);border-radius:12px;padding:12px;margin:4px 0 12px;font-size:14.5px;color:var(--blue-d)}
+.match .row{margin-top:8px}
+
+/* sheet */
+.sheet{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet.hidden{display:none}
+.sheet-bg{position:absolute;inset:0;background:rgba(13,20,33,.5)}
+.sheet-card{position:relative;background:var(--bg);width:100%;max-width:640px;max-height:92vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:8px 16px calc(20px + var(--sb));animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:.4}}
+.grab{width:40px;height:5px;border-radius:3px;background:#C9CCC4;margin:4px auto 12px}
+.sh-t{font:700 24px "Barlow Condensed";margin:0 0 2px;line-height:1.1}
+.sh-s{color:var(--ink2);font-size:14px;margin-bottom:12px}
+.hero-img{width:100%;aspect-ratio:4/3;border-radius:14px;background:#ddd center/cover;margin-bottom:12px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14.5px}
+.kv dt{color:var(--ink2)}
+.kv dd{margin:0;font-weight:600;text-align:right}
+.acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.act{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;font-weight:700}
+.act svg{width:22px;height:22px;color:var(--blue)}
+.act.r svg{color:var(--red)}
+.act:disabled{opacity:.4}
+
+/* log */
+.lg{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.lg:last-child{border-bottom:0}
+.lg .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;font-size:16px}
+.lg .ic.add{background:var(--ok-l);color:var(--ok)}
+.lg .ic.move{background:var(--tr-l);color:var(--tr)}
+.lg .ic.sell{background:var(--red-l);color:var(--red)}
+.lg .ic.edit{background:var(--blue-l);color:var(--blue)}
+.lg small{display:block;color:var(--ink3);font-size:12.5px;margin-top:2px}
+.empty{text-align:center;color:var(--ink2);padding:30px 16px;font-size:15px;line-height:1.5}
+.empty b{display:block;font:700 20px "Barlow Condensed";color:var(--ink);margin-bottom:4px}
+
+.answer{white-space:pre-wrap;font-size:15px;line-height:1.5;margin-top:10px;background:#F7F8F4;border-radius:10px;padding:10px 12px}
+.answer:empty{display:none}
+
+#toast{position:fixed;left:50%;bottom:calc(92px + var(--sb));transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 16px;border-radius:12px;font-size:14.5px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%)}
+.muted{color:var(--ink2);font-size:14px}
+body.embed .top{display:none}
+body.embed main{padding-top:6px}
+.foot{text-align:center;color:var(--ink3);font-size:12.5px;margin-top:22px}
+.vh{position:absolute!important;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0);pointer-events:none}
+label.btn,label.bigcam,label.ph{cursor:pointer}
+.tabs.six{grid-template-columns:repeat(6,1fr)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:#E4E6E0;border-radius:12px;padding:4px;margin-bottom:12px;gap:4px}
+.seg button{padding:9px 6px;border-radius:9px;font-weight:700;font-size:14px;color:var(--ink2)}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.line{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px}
+.line .top2{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.line .top2 b{font-size:13px;color:var(--ink3)}
+.line .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.line .g3 .inp,.line .inp{padding:8px 10px;font-size:15px}
+.line small{display:block;font-size:11.5px;color:var(--ink2);margin:6px 0 2px 2px;font-weight:600}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-top:8px}
+.chk input{width:20px;height:20px;accent-color:var(--blue)}
+.tot{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:15px;align-items:center}
+.tot .inp{width:130px;text-align:right;padding:8px 10px}
+.tot b.big{font:700 22px "JetBrains Mono";color:var(--blue-d)}
+.rupee{font-family:"JetBrains Mono",monospace;font-weight:700}
+.inv{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:8px}
+.inv .th{width:52px;height:64px;border-radius:8px;background:#EEF0EA center/cover;flex:none}
+.inv .tx{flex:1;min-width:0}.inv .tx b{display:block;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inv .tx small{display:block;font-size:12.5px;color:var(--ink2);margin-top:2px}
+.bp{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:8px}
+.bp .r1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.bp .r1 b{font-size:15.5px}.bp .r2{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ink2);margin-top:6px}
+.bp .r2 span b{color:var(--ink);font-family:"JetBrains Mono",monospace}
+.buyline{background:var(--warn-l);border-radius:10px;padding:9px 12px;font-size:14px;margin-bottom:10px;color:#5a3700}
+.pages{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px}
+.pages a{flex:none;width:120px;height:160px;border-radius:10px;background:#ddd center/cover;border:1px solid var(--line)}
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{text-align:left;color:var(--ink2);font-weight:600;padding:6px 4px;border-bottom:1px solid var(--line)}
+.tbl td{padding:7px 4px;border-bottom:1px solid #EEF0EA;vertical-align:top}
+.tbl td.n{text-align:right;font-family:"JetBrains Mono",monospace;white-space:nowrap}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--blue-l);color:var(--blue)}
+.lock{font-size:12px;color:var(--warn);font-weight:700}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="logo">TL</div>
+    <div><div class="bn">TL PATHAK GROUP</div><div class="bs">Stock Live <span id="live" class="dot"></span><span id="liveTxt">connecting…</span></div></div>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center"><button id="locBtn" class="locchip" aria-label="Where am I">📍 <span id="locName">I'm at…</span></button><button id="setBtn" class="locchip" aria-label="Settings" style="padding:7px 10px">⚙</button></div>
+</header>
+<div id="banner"></div>
+<main id="view"></main>
+<nav class="tabs" id="tabs"></nav>
+<div id="sheet" class="sheet hidden"><div class="sheet-bg" id="sheetBg"></div><div class="sheet-card" id="sheetCard"></div></div>
+<div id="toast"></div>
+<!-- Photo inputs: opened by <label for>, which works inside the Claude app where scripted clicks and direct camera access can be blocked -->
+<input type="file" id="mPick" class="vh" accept="image/*">
+<input type="file" id="mCam" class="vh" accept="image/*" capture="environment">
+<input type="file" id="mGal" class="vh" accept="image/*" multiple>
+<input type="file" id="iPick" class="vh" accept="image/*" multiple>
+<input type="file" id="iCam" class="vh" accept="image/*" capture="environment">
+<input type="file" id="plPick" class="vh" accept="image/*,application/pdf,.pdf,.xlsx,.xls,.csv" multiple>
+<input type="file" id="plCam" class="vh" accept="image/*" capture="environment">
+<input type="file" id="sPick" class="vh" accept="image/*" multiple>
+<input type="file" id="sCam" class="vh" accept="image/*" capture="environment">
+
+<script>
+if(new URLSearchParams(location.search).get('embed'))document.body.classList.add('embed');
+/* ================= constants ================= */
+const CATS=["Machine Tools","CNC","Sheet Metal","Construction","Material Handling","Wood & uPVC","Recycling","Special Purpose","Spares & Tools","Other"];
+const STATUS=["In stock","Reserved","In transit","Demo","Sold"];
+const COND=["New","Used","Refurbished","Display"];
+const VIEWS=['home','stock','snap','buy','log','places'];
+const svg=(d,w)=>`<svg viewBox="0 0 24 24" ${w?`width="${w}" height="${w}"`:''} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const IC={
+ home:svg('<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'),
+ stock:svg('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>'),
+ cam:svg('<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>'),
+ buy:svg('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>'),
+ log:svg('<path d="M7 7h13M7 12h13M7 17h13"/><path d="M3.5 7h.01M3.5 12h.01M3.5 17h.01"/>'),
+ pin:svg('<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'),
+ move:svg('<path d="M4 12h15M14 6l6 6-6 6"/>'),
+ sell:svg('<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>'),
+ res:svg('<path d="M6 3h12v18l-6-4-6 4z"/>'),
+ edit:svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>'),
+ plus:svg('<path d="M12 5v14M5 12h14"/>'),
+ minus:svg('<path d="M5 12h14"/>'),
+ wa:svg('<path d="M3 21l1.6-4.6A8.5 8.5 0 1 1 8 19.6z"/><path d="M9 9.5c.3 2.3 2.2 4.4 4.6 5l1.2-1.3 2 1"/>'),
+ del:svg('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'),
+ box:svg('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/>',24)
+};
+
+/* ================= storage & config ================= */
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function ssGet(k){try{return sessionStorage.getItem(k)}catch(e){return null}}
+function ssSet(k,v){try{v?sessionStorage.setItem(k,v):sessionStorage.removeItem(k)}catch(e){}}
+const CFG={api:lsGet('tlp_api')||'',token:lsGet('tlp_token')||'',me:lsGet('tlp_me')||'',pin:ssGet('tlp_pin')||''};
+(function(){try{const u=new URL(location.href);let ch=false;
+  for(const [k,s] of [['api','tlp_api'],['token','tlp_token'],['loc','tlp_myloc']]){const v=u.searchParams.get(k);if(v){lsSet(s,v);if(k==='api')CFG.api=v;if(k==='token')CFG.token=v;u.searchParams.delete(k);ch=true}}
+  if(u.searchParams.get('q'))window._startQ=u.searchParams.get('q');
+  if(ch)history.replaceState(null,'',u.pathname+u.search+u.hash);
+}catch(e){}})();
+function myLoc(){return lsGet('tlp_myloc')||''}
+
+/* ================= state ================= */
+let MODE=null; // 'claude' (hosted in Claude, live db) | 'sheet' (your Google Sheet via Apps Script) | 'none'
+const K={db:null,user:null,sample:null,assets:null,meId:'',canEdit:false,canWrite:true,aiImages:null,aiOk:true};
+const S={items:[],locations:[],log:[],purchases:[],sales:[],clients:[],pricelists:[],ver:'',loaded:false};
+const names={};
+const ui={view:'home',q:window._startQ||'',fLoc:'all',fCat:'all',showSold:false,open:{},logLoc:'all',snapMode:'machine',buyMode:'sales',bq:''};
+let snap=newSnap(),inv=newInv();
+function newSnap(){return {photos:[],busy:false,err:'',active:false,manual:false,aiDone:false,groupTouched:false,form:{name:'',category:'Machine Tools',type:'',size:'',group:'',brand:'',model:'',serial:'',condition:'New',specs:[],locationId:myLoc(),qty:1,status:'In stock',notes:'',confidence:'',tip:''}}}
+function newInv(){return {photos:[],busy:false,err:'',active:false,aiDone:false,saving:false,f:{supplier:'',gstin:'',invoiceNo:'',date:new Date().toISOString().slice(0,10),locationId:myLoc(),lines:[],tax:0,freight:0,total:0,notes:'',confidence:''}}}
+const isAdmin=()=>MODE==='claude'?K.canEdit:MODE==='sheet'?!!CFG.pin:false;
+const meTag=()=>MODE==='claude'?(K.meId||''):(CFG.me||'Someone');
+
+/* ================= helpers ================= */
+const $=s=>document.querySelector(s);
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function okUrl(u){return typeof u==='string'&&(/^data:image\//.test(u)||/^https:\/\//.test(u)||/^\/_blob\/[\w-]+$/.test(u))}
+function cssUrl(u){return okUrl(u)?`background-image:url("${u.replace(/["\\()]/g,m=>encodeURIComponent(m))}")`:''}
+function locById(id){return S.locations.find(l=>l.id===id)}
+function locNm(id){const l=locById(id);return l?l.name:'Unassigned'}
+function shortLoc(id){const n=locNm(id);return n.replace(/\s*(Showroom|Warehouse|Godown)\s*/i,'').trim()||n}
+function live(i){return i.status!=='Sold'&&(+i.qty||0)>0}
+function q(i){return Math.max(0,+i.qty||0)}
+function num(v){const n=parseFloat(String(v??'').replace(/[^\d.\-]/g,''));return isFinite(n)?n:0}
+function inr(v){return '₹'+Math.round(num(v)).toLocaleString('en-IN')}
+function ago(t){if(!t)return '';const s=(Date.now()-t)/1000;if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';if(s<604800)return Math.floor(s/86400)+'d ago';return new Date(t).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}
+function fdate(d){if(!d)return '';const x=new Date(d);return isNaN(x)?String(d):x.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}
+function groupOf(i){return i.group||[i.type,i.size].filter(Boolean).join(' · ')||i.name||'Ungrouped'}
+function who(x){return MODE==='claude'?(names[x]||'Someone'):(x||'Someone')}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),3000)}
+function setLive(s){$('#live').className='dot '+(s==='on'?'on':s==='off'?'off':'');$('#liveTxt').textContent={on:'live',off:'offline',setup:'not set up',slow:'can’t reach yet…'}[s]||'connecting…'}
+function banner(h){$('#banner').innerHTML=h?`<div class="bnr">${h}</div>`:''}
+function stBadge(s){return `<span class="badge ${esc((s||'In stock').replace(/\s/g,'-'))}">${esc(s||'In stock')}</span>`}
+function sortedLocs(){return [...S.locations].sort((a,b)=>(a.kind===b.kind?0:a.kind==='showroom'?-1:1)||(a.name||'').localeCompare(b.name||''))}
+function locOptions(sel,blank,disable){return (blank?`<option value="">${esc(blank)}</option>`:'')+sortedLocs().map(l=>`<option value="${esc(l.id)}" ${l.id===sel?'selected':''} ${l.id===disable?'disabled':''}>${esc(l.name)}</option>`).join('')}
+function allGroups(){return [...new Set([...S.items.map(groupOf),...S.purchases.flatMap(p=>(p.lines||[]).map(l=>l.group))].filter(Boolean))]}
+function newId(p){return p+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function aiErr(e){const c=e&&e.code;return ({not_granted:'You declined AI for this page. Re-open the page and tap “Allow” to use photo reading.',images_unavailable:'This Claude app view can’t send photos to AI. Open the page in a browser (claude.ai) or fill the details by hand.',image_rejected:'That photo couldn’t be read — try a JPG/PNG photo.',rate_limited:'Too many AI requests — wait a minute, then tap “Read again”.',sampling_disabled:'AI isn’t enabled for this account.',invalid_json:'AI reply was unclear — tap “Read again”.',session_expired:'Sign in to Claude again, then retry.',refused:'AI couldn’t read this photo — try another.'})[c]||(e&&e.message)||'Could not read the photo.'}
+
+/* ================= images ================= */
+function loadImage(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file);const im=new Image();im.onload=()=>res({im,u});im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('This photo format can’t be opened here (HEIC?). In camera settings choose “Most compatible”, or take a screenshot of it.'))};im.src=u})}
+function scaled(im,max){const r=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.naturalWidth*r));c.height=Math.max(1,Math.round(im.naturalHeight*r));const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);return c}
+const toBlob=(c,qq)=>new Promise(r=>c.toBlob(r,'image/jpeg',qq));
+async function prepPhoto(file,kind){
+  const {im,u}=await loadImage(file);
+  const big=scaled(im,kind==='inv'?1800:1280);
+  const out={blob:await toBlob(big,kind==='inv'?.85:.8),data:big.toDataURL('image/jpeg',kind==='inv'?.85:.8),thumb:scaled(im,kind==='inv'?900:480).toDataURL('image/jpeg',.66)};
+  URL.revokeObjectURL(u);return out;
+}
+
+/* ================= AI prompts (same for both modes) ================= */
+function machinePrompt(groups){return `You are the stock-taking assistant for TL Pathak Group (Howrah, India), a 60-year-old industrial machinery maker and dealer. Its own lines include Indie-Turn (lathes), Indie-Drill, Indie-Lift (material handling) and InDiBuild (construction machines). It stocks lathes, drilling machines (pillar/radial/bench), milling, shapers, slotters, power presses, hydraulic presses, shearing machines, press brakes, CNC machines, construction machines (concrete mixers, bar benders, bar cutters, vibrators), material handling (hand pallet trucks, stackers, hoists, cranes, scissor lifts), wood & uPVC machines, recycling machines and special-purpose machines.
+
+The photo(s) show ONE machine on a showroom or warehouse floor; one photo may be a close-up of its nameplate.
+1. Identify the machine type precisely (e.g. "All-Geared Lathe", "V-Belt Lathe", "Pillar Drill", "Radial Drill", "Hand Pallet Truck").
+2. Read any nameplate / sticker text EXACTLY: brand, model, serial no., capacity, motor HP/kW, year.
+3. Headline size the trade uses: lathe = bed length in feet (e.g. "6 ft") and swing; drill = drilling capacity mm; power/hydraulic press = tonnage; shearing = cutting length x thickness; press brake = tonnage x length; pallet truck/stacker/hoist/crane = capacity in tons; concrete mixer = bag or litre capacity; bar bender/cutter = max bar dia mm. If estimated from the picture rather than read from a plate, append " (est.)".
+4. group = "<Type> · <Size>", e.g. "All-Geared Lathe · 6 ft". If one of these existing groups is the same kind and size, return it EXACTLY: ${JSON.stringify(groups.slice(0,150))}
+5. category one of ${JSON.stringify(CATS)}.
+6. specs = 3 to 8 facts a buyer cares about, short labels, values with units.
+7. condition one of ${JSON.stringify(COND)} (New unless it clearly looks used).
+8. confidence = "high" | "medium" | "low". tip = one short line on what to photograph to confirm, or "" if confident.
+9. name = short sales name, e.g. "6 ft All-Geared Lathe Machine".
+Reply with ONLY this JSON: {"name":"","category":"","type":"","size":"","group":"","brand":"","model":"","serial":"","condition":"","specs":[{"label":"","value":""}],"confidence":"","tip":""}`}
+function invoicePrompt(groups){return `These photo(s) are the pages of ONE purchase invoice / bill received by TL Pathak Group, an Indian industrial machinery company (usually a GST tax invoice; may be printed or handwritten). Extract exactly what is written — never invent numbers. If a value is unreadable, leave it empty or 0 and mention it in "notes".
+Numbers: plain numbers, no commas, no ₹. Date: YYYY-MM-DD.
+For EACH line item: desc (as written), hsn, qty, unit (Nos/Set/Kg…), rate (per unit, BEFORE GST), amount (line taxable value, BEFORE GST), gst (GST rate % if shown, else 0), isMachine (true for machines/equipment we would keep in stock, false for spares, consumables, services, freight), group: for machines, return the matching stock group EXACTLY if one of these is the same kind and size: ${JSON.stringify(groups.slice(0,150))}; otherwise propose "<Machine Type> · <Size>" (e.g. "All-Geared Lathe · 6 ft"); "" for non-machines.
+Also: supplier (seller's name), gstin (seller's GSTIN), invoiceNo, date, subtotal (total taxable value), tax (total GST = CGST+SGST or IGST), freight (freight/transport/packing/loading/other charges, before GST, 0 if none), total (grand total payable), confidence ("high"|"medium"|"low"), notes (short: anything unclear).
+Reply with ONLY this JSON: {"supplier":"","gstin":"","invoiceNo":"","date":"","lines":[{"desc":"","hsn":"","qty":0,"unit":"","rate":0,"amount":0,"gst":0,"isMachine":true,"group":""}],"subtotal":0,"tax":0,"freight":0,"total":0,"confidence":"","notes":""}`}
+
+/* ================= BACKEND: Claude-hosted ================= */
+const CB={
+  async init(){
+    const db=K.db;
+    const timer=setTimeout(()=>{if(!S.loaded){setLive('slow');banner('Can’t reach live stock yet — check your internet. It will connect by itself.')}},10000);
+    const fail=e=>{setLive('off');banner('Live updates stopped'+(e&&e.message?': '+esc(e.message):'')+'. Reopen the page to reconnect.')};
+    db.collection('items').onSnapshot(s=>{S.items=s.docs.map(d=>({...d.data(),id:d.id}));S.loaded=true;if(!s.metadata.fromCache){clearTimeout(timer);setLive('on');if(K.canWrite)banner('')}resolveNames();render()},fail);
+    db.collection('locations').onSnapshot(s=>{S.locations=s.docs.map(d=>({...d.data(),id:d.id}));render()},fail);
+    db.collection('log').orderBy('at','desc').limit(150).onSnapshot(s=>{S.log=s.docs.map(d=>({...d.data(),id:d.id}));resolveNames();if(ui.view==='log')render()},fail);
+    db.collection('sales').onSnapshot(s=>{S.sales=s.docs.map(d=>({...d.data(),id:d.id}));if(['buy','home'].includes(ui.view))render()},()=>{});
+    db.collection('clients').onSnapshot(s=>{S.clients=s.docs.map(d=>({...d.data(),id:d.id}));if(ui.view==='buy')render()},()=>{});
+    if(K.canEdit){let PLm=[],PLi=[];const mergePL=()=>{S.pricelists=PLm.map(l=>({...l,items:PLi.filter(c=>c.listId===l.id).sort((a,b)=>a.part-b.part).flatMap(c=>c.items||[])}));if(ui.view==='buy'&&!pl.active)render()};
+      db.collection('pricelists').onSnapshot(s=>{PLm=s.docs.map(d=>({...d.data(),id:d.id}));mergePL()},()=>{});
+      db.collection('plitems').onSnapshot(s=>{PLi=s.docs.map(d=>d.data());mergePL()},()=>{})}
+    if(K.canEdit)db.collection('purchases').onSnapshot(s=>{S.purchases=s.docs.map(d=>({...d.data(),id:d.id}));if(['buy','stock'].includes(ui.view))render()},()=>{});
+  },
+  log(o){K.db.collection('log').add({at:Date.now(),by:meTag(),...o}).catch(()=>{})},
+  find(id){const i=S.items.find(x=>x.id===id);if(!i)throw new Error('Item not found — refresh');return i},
+  async addOrInc(it,qty,by,thumbs){
+    const m=S.items.find(x=>live(x)&&x.locationId===it.locationId&&groupOf(x).toLowerCase()===groupOf(it).toLowerCase()&&(x.model||'').toLowerCase()===(it.model||'').toLowerCase()&&!x.serial&&!it.serial&&(x.status||'In stock')===(it.status||'In stock')&&(x.condition||'New')===(it.condition||'New'));
+    const now=Date.now();
+    if(m){await K.db.doc('items/'+m.id).update({qty:q(m)+qty,updatedAt:now,updatedBy:by,...(!(m.photos&&m.photos.length)&&thumbs&&thumbs.length?{photos:thumbs}:{})});this.log({action:'add',itemId:m.id,itemName:m.name,qty,to:m.locationId});return m.id}
+    const ref=await K.db.collection('items').add({name:'',category:'Other',type:'',size:'',brand:'',model:'',serial:'',condition:'New',specs:[],status:'In stock',notes:'',...it,qty,photos:thumbs||[],addedBy:by,updatedBy:by,createdAt:now,updatedAt:now});
+    this.log({action:'add',itemId:ref.id,itemName:it.name,qty,to:it.locationId});return ref.id;
+  },
+  async op(a,p){
+    const db=K.db,by=meTag(),now=Date.now();
+    switch(a){
+      case 'addItem':{const ref=await db.collection('items').add({...p.item,photos:p.thumbs||[],addedBy:by,updatedBy:by,createdAt:now,updatedAt:now});this.log({action:'add',itemId:ref.id,itemName:p.item.name,qty:p.item.qty,to:p.item.locationId});return}
+      case 'adjust':{const i=this.find(p.id),nq=Math.max(0,q(i)+p.delta);await db.doc('items/'+i.id).update({qty:nq,updatedAt:now,updatedBy:by,...(nq>0&&i.status==='Sold'?{status:'In stock'}:{}),...(p.thumbs&&p.thumbs.length&&!(i.photos&&i.photos.length)?{photos:p.thumbs}:{})});this.log({action:p.delta>0?'add':'remove',itemId:i.id,itemName:i.name,qty:Math.abs(p.delta),[p.delta>0?'to':'from']:i.locationId});return}
+      case 'updateItem':{const i=this.find(p.id),u={...p.patch,updatedAt:now,updatedBy:by};if(u.status&&u.status!=='Reserved')u.reservedFor='';await db.doc('items/'+i.id).update(u);this.log({action:'edit',itemId:i.id,itemName:u.name||i.name,from:i.locationId,note:u.qty!==undefined&&u.qty!==q(i)?`qty ${q(i)} → ${u.qty}`:''});return}
+      case 'move':{const i=this.find(p.id),n=Math.min(q(i),Math.max(1,p.qty));
+        if(n>=q(i))await db.doc('items/'+i.id).update({locationId:p.to,status:p.status,updatedAt:now,updatedBy:by});
+        else{await db.doc('items/'+i.id).update({qty:q(i)-n,updatedAt:now,updatedBy:by});const {id,...rest}=i;
+          const d=S.items.find(x=>x.id!==i.id&&live(x)&&x.locationId===p.to&&groupOf(x)===groupOf(i)&&(x.model||'')===(i.model||'')&&!x.serial&&!i.serial&&(x.status||'In stock')===p.status&&(x.condition||'New')===(i.condition||'New'));
+          if(d)await db.doc('items/'+d.id).update({qty:q(d)+n,updatedAt:now,updatedBy:by});else await db.collection('items').add({...rest,qty:n,locationId:p.to,status:p.status,createdAt:now,updatedAt:now,addedBy:by,updatedBy:by})}
+        this.log({action:'move',itemId:i.id,itemName:i.name,qty:n,from:i.locationId,to:p.to,note:(p.note||'')+(p.status==='In transit'?(p.note?' · ':'')+'in transit':'')});return}
+      case 'sell':{const i=this.find(p.id),n=Math.min(q(i),Math.max(1,p.qty)),left=q(i)-n;await db.doc('items/'+i.id).update({qty:left,...(left<=0?{status:'Sold',soldAt:now}:{}),updatedAt:now,updatedBy:by});this.log({action:'sell',itemId:i.id,itemName:i.name,qty:n,from:i.locationId,note:p.note||''});return}
+      case 'reserve':{const i=this.find(p.id);await db.doc('items/'+i.id).update({status:p.on?'Reserved':'In stock',reservedFor:p.on?(p.name||''):'',updatedAt:now,updatedBy:by});this.log({action:'reserve',itemId:i.id,itemName:i.name,qty:q(i),from:i.locationId,note:p.on?(p.name||'reserved'):'Released'});return}
+      case 'deleteItem':{const i=this.find(p.id);await db.doc('items/'+i.id).delete();this.log({action:'delete',itemId:i.id,itemName:i.name,from:i.locationId});return}
+      case 'saveLocation':{const b={name:p.loc.name,kind:p.loc.kind,city:p.loc.city};if(p.loc.id)await db.doc('locations/'+p.loc.id).update(b);else await db.collection('locations').add({...b,createdAt:now});return}
+      case 'deleteLocation':{const n=S.items.filter(i=>live(i)&&i.locationId===p.id).length;if(n)throw new Error('Move its '+n+' stock records out first');await db.doc('locations/'+p.id).delete();return}
+      case 'savePurchase':{
+        const images=[];
+        for(const ph of p.photos){
+          if(K.assets){try{const r=await K.assets.upload(ph.blob);images.push(okUrl(r.url)?r.url:('/_blob/'+r.id));continue}catch(e){}}
+          if(images.join('').length<150000)images.push(ph.thumb); // fallback: small copy kept in the record
+        }
+        const rec={...p.rec,images,by,createdAt:now};
+        const ref=await db.collection('purchases').add(rec);
+        for(const l of rec.lines.filter(l=>l.addStock&&l.group&&num(l.qty)>0))
+          await this.addOrInc({name:l.desc||l.group,group:l.group,category:l.category||'Machine Tools',locationId:rec.locationId,notes:'From invoice '+(rec.invoiceNo||'')+' · '+(rec.supplier||'')},Math.round(num(l.qty)),by,[]);
+        this.log({action:'purchase',itemName:(rec.supplier||'Supplier')+' inv '+(rec.invoiceNo||''),to:rec.locationId,note:rec.lines.filter(l=>l.addStock).length?'stock added':''});
+        return ref.id}
+      case 'deletePurchase':{await db.doc('purchases/'+p.id).delete();return}
+      case 'saveSale':{await cbSaveSale(p);return}
+      case 'savePriceList':{await cbSavePriceList(p);return}
+      case 'deletePriceList':{await cbDeletePriceList(p.id);return}
+      case 'deleteSale':{await db.doc('sales/'+p.id).delete();return}
+    }
+    throw new Error('Unknown action');
+  },
+  async vision(prompt,photos){
+    if(!K.sample)throw {code:'sampling_disabled',message:'AI isn’t available in this view.'};
+    if(K.aiImages===false)throw {code:'images_unavailable'};
+    return K.sample.json(prompt,{images:photos.map(p=>p.blob),modelTier:'default',cache:false});
+  },
+  async json(prompt){if(!K.sample)throw {code:'sampling_disabled',message:'AI isn’t available in this view.'};return K.sample.json(prompt,{modelTier:'default',cache:false})},
+  async text(prompt,onText){if(!K.sample)throw {message:'AI isn’t available in this view.'};const r=await K.sample(prompt,{cache:false,onText:({text})=>onText&&onText(text)});return r.text}
+};
+
+/* ================= BACKEND: your Google Sheet (Apps Script) ================= */
+const SB={
+  async get(params){const u=CFG.api+(CFG.api.includes('?')?'&':'?')+new URLSearchParams({token:CFG.token,pin:CFG.pin,...params});const r=await fetch(u,{redirect:'follow'});const j=await r.json();if(!j.ok)throw new Error(j.error||'Request failed');return j},
+  async post(body){const r=await fetch(CFG.api,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,token:CFG.token,by:CFG.me||'Someone',pin:CFG.pin})});const j=await r.json();if(!j.ok)throw new Error(j.error||'Request failed');if(j.data)applyState(j.data);return j},
+  async init(){await this.refresh(true);setInterval(()=>{if(document.visibilityState==='visible'&&!busyWrite)this.refresh(false)},8000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')this.refresh(false)})},
+  async refresh(full){try{if(!full&&S.loaded){const v=await this.get({action:'ver'});if(v.ver===S.ver){setLive('on');return}}const j=await this.get({action:'all'});applyState(j.data);banner('')}catch(e){setLive('off');if(!S.loaded){S.loaded=true;banner('Can’t reach the stock server: '+esc(e.message)+'. Check ⚙ Settings.');render()}}},
+  async op(a,p){
+    const b={action:a};
+    if(a==='addItem'){b.item=p.item;b.photos=p.thumbs}
+    else if(a==='adjust'){b.id=p.id;b.delta=p.delta;b.photos=p.thumbs}
+    else if(a==='savePurchase'||a==='saveSale'||a==='savePriceList'){b.rec=p.rec;b.photos=p.photos.map(x=>x.data)}
+    else Object.assign(b,p);
+    return this.post(b);
+  },
+  async vision(prompt,photos){const j=await this.post({action:'vision',prompt,images:photos.map(p=>p.data)});return j.result},
+  async json(prompt){const j=await this.post({action:'json',prompt});return j.result},
+  async text(prompt){const j=await this.post({action:'text',prompt});return j.answer}
+};
+function applyState(d){S.items=d.items||[];S.locations=d.locations||[];S.log=d.log||[];if(d.purchases)S.purchases=d.purchases;if(d.sales)S.sales=d.sales;if(d.clients)S.clients=d.clients;if(d.priceLists)S.pricelists=d.priceLists;S.ver=d.ver||'';S.loaded=true;setLive('on');render()}
+const BE=()=>MODE==='claude'?CB:SB;
+
+let busyWrite=false;
+async function act(a,p,okMsg){
+  if(MODE==='none'){openSettings();return false}
+  if(MODE==='claude'&&!K.canWrite){toast('View-only: ask Hitesh for Contributor access.');return false}
+  if(MODE==='sheet'&&!CFG.me){toast('Enter your name in ⚙ Settings first');openSettings();return false}
+  if(busyWrite){toast('Saving… one moment');return false}
+  busyWrite=true;
+  try{await BE().op(a,p);if(okMsg)toast(okMsg);return true}
+  catch(e){
+    if(e&&e.code==='invalid_argument'){K.canWrite=false;toast('You don’t have permission for that.')}
+    else if(e&&e.code==='quota_exceeded')toast('Storage full: '+(e.message||''));
+    else toast((e&&e.message)||'Could not save');
+    return false;
+  }finally{busyWrite=false}
+}
+
+/* ================= AI flows ================= */
+async function identify(){
+  if(!snap.photos.length)return;
+  snap.busy=true;snap.err='';renderView();
+  try{
+    const out=await BE().vision(machinePrompt(allGroups()),snap.photos);
+    if(!out||typeof out!=='object')throw new Error('AI reply was unclear — tap “Read again”.');
+    const f=snap.form;
+    for(const k of ['name','type','size','brand','model','serial','tip','confidence'])if(typeof out[k]==='string')f[k]=out[k].slice(0,140);
+    if(CATS.includes(out.category))f.category=out.category;
+    if(COND.includes(out.condition))f.condition=out.condition;
+    if(Array.isArray(out.specs))f.specs=out.specs.filter(s=>s&&s.label).slice(0,10).map(s=>({label:String(s.label).slice(0,40),value:String(s.value??'').slice(0,80)}));
+    f.group=(typeof out.group==='string'&&out.group.trim())?out.group.trim().slice(0,90):[f.type,f.size].filter(Boolean).join(' · ');
+    snap.aiDone=true;snap.groupTouched=false;
+  }catch(e){snap.err=aiErr(e)}
+  snap.busy=false;renderView();
+}
+async function readInvoice(){
+  if(!inv.photos.length)return;
+  inv.busy=true;inv.err='';renderView();
+  try{
+    const o=await BE().vision(invoicePrompt(allGroups()),inv.photos);
+    if(!o||typeof o!=='object')throw new Error('AI reply was unclear — tap “Read again”.');
+    const f=inv.f;
+    for(const k of ['supplier','gstin','invoiceNo','notes','confidence'])if(typeof o[k]==='string')f[k]=o[k].slice(0,200);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(o.date||''))f.date=o.date;
+    f.tax=num(o.tax);f.freight=num(o.freight);f.total=num(o.total);
+    f.lines=(Array.isArray(o.lines)?o.lines:[]).slice(0,40).map(l=>{const qty=num(l.qty)||1,rate=num(l.rate),amount=num(l.amount)||+(qty*rate).toFixed(2);return {desc:String(l.desc||'').slice(0,160),hsn:String(l.hsn||'').slice(0,12),qty,unit:String(l.unit||'Nos').slice(0,10),rate:rate||(qty?+(amount/qty).toFixed(2):0),amount,gst:num(l.gst),group:String(l.group||'').slice(0,90),addStock:!!l.isMachine&&!!l.group}});
+    inv.aiDone=true;
+  }catch(e){inv.err=aiErr(e)}
+  inv.busy=false;renderView();
+}
+async function askStock(){
+  const qEl=$('#askQ'),out=$('#askA'),btn=$('#askBtn');const question=(qEl.value||'').trim();if(!question)return;
+  btn.disabled=true;out.textContent='Thinking…';
+  const rows=S.items.filter(live).slice(0,600).map(i=>[groupOf(i),i.name,locNm(i.locationId),'qty '+q(i),i.status||'In stock',i.model||'',i.condition||''].join(' | ')).join('\n');
+  let buy='';if(isAdmin()&&(S.purchases.length||S.pricelists.length)){buy='\nCost prices (group | last invoice rate excl. GST | avg | supplier | date | cheapest price-list net | price-list maker):\n'+buyTable().slice(0,250).map(b=>[b.group,b.last||'-',b.avg||'-',b.supplier,b.date,b.pl?b.pl.net:'-',b.pl?b.pl.mfr:'-'].join(' | ')).join('\n')}
+  const prompt=`You answer questions about TL Pathak Group's live machine stock across its showrooms and warehouses. Today is ${new Date().toDateString()}.
+Locations: ${S.locations.map(l=>l.name+' ('+(l.kind||'showroom')+')').join(', ')}
+Stock rows (group | name | location | qty | status | model | condition):
+${rows||'(no stock recorded yet)'}${buy}
+
+Question: ${question}
+Answer in plain text, short, with exact numbers and location names. Reserved and in-transit units are not free to sell. If the data can't answer it, say what's missing.`;
+  try{out.textContent=await BE().text(prompt,t=>{out.textContent=t})}catch(e){out.textContent='Could not answer: '+aiErr(e)}
+  btn.disabled=false;
+}
+
+/* ================= buy prices ================= */
+function landed(l,p){const sub=(p.lines||[]).reduce((a,x)=>a+num(x.amount),0)||1;const qty=num(l.qty)||1;return num(l.rate)+(num(p.freight)*num(l.amount)/sub)/qty}
+function buyTable(){
+  const g={};S.pricelists.forEach(l=>(l.items||[]).forEach(it=>{if(it.group&&!g[it.group])g[it.group]=[]}));
+  S.purchases.forEach(p=>(p.lines||[]).forEach(l=>{if(!l.group)return;(g[l.group]=g[l.group]||[]).push({rate:num(l.rate),landed:landed(l,p),qty:num(l.qty)||1,supplier:p.supplier,date:p.date,inv:p.invoiceNo,pid:p.id})}));
+  return Object.entries(g).map(([group,arr])=>{arr.sort((a,b)=>String(b.date).localeCompare(String(a.date)));const tq=arr.reduce((a,x)=>a+x.qty,0)||1;
+    const stock=S.items.filter(i=>live(i)&&groupOf(i)===group).reduce((a,i)=>a+q(i),0);const pb=plBest(group);
+    if(!arr.length)return {group,listOnly:true,last:0,lastLanded:pb?pb.net:0,avg:0,min:0,supplier:pb?pb.mfr:'',date:pb?pb.date:'',buys:0,qtyBought:0,stock,stockValue:Math.round(stock*(pb?pb.net:0)),pl:pb};
+    return {group,last:Math.round(arr[0].rate),lastLanded:Math.round(arr[0].landed),avg:Math.round(arr.reduce((a,x)=>a+x.rate*x.qty,0)/tq),min:Math.round(Math.min(...arr.map(x=>x.rate))),supplier:arr[0].supplier||'',date:arr[0].date||'',buys:arr.length,qtyBought:tq,stock,stockValue:Math.round(stock*arr[0].landed),pl:pb}}).sort((a,b)=>a.group.localeCompare(b.group));
+}
+function buyFor(group){return isAdmin()?buyTable().find(b=>b.group===group):null}
+
+/* ================= render ================= */
+function tabsHTML(){
+  const t=[['home','Home',IC.home],['stock','Stock',IC.stock],['snap','Snap',IC.cam],['buy','Bills',IC.buy],['log','Moves',IC.log],['places','Places',IC.pin]];
+  $('#tabs').className='tabs'+(t.length===6?' six':'');
+  $('#tabs').innerHTML=t.map(([v,l,i])=>v==='snap'?`<button class="tab snapbtn ${ui.view===v?'act':''}" data-v="snap"><span class="ring">${i}</span>${l}</button>`:`<button class="tab ${ui.view===v?'act':''}" data-v="${v}">${i}${l}</button>`).join('');
+}
+function render(){
+  tabsHTML();
+  const ml=locById(myLoc());$('#locName').textContent=ml?ml.name:'I’m at…';
+  if(ui.view==='snap'&&(snap.active||inv.active||sale.active))return;
+  if(ui.view==='buy'&&pl.active)return;
+  const ae=document.activeElement;if(ae&&['askQ','bq'].includes(ae.id))return;
+  if(ui.view==='stock'&&$('#list')){renderList();return}
+  renderView();
+}
+function renderView(){
+  tabsHTML();
+  const v=$('#view');
+  if(MODE==='none'){v.innerHTML=`<div class="card snap-hero"><h2>Connect your stock</h2><p>Open the setup link Hitesh sent you, or tap below and paste the stock server URL and team key.</p><button class="btn block" id="openSettings">Open settings</button></div>`;return}
+  if(!S.loaded&&MODE){v.innerHTML=loadingHTML();return}
+  if(!MODE){v.innerHTML=loadingHTML();return}
+  ({home:homeV,stock:stockV,snap:snapV,buy:buyV,log:logV,places:placesV}[ui.view]||homeV)(v);
+}
+function loadingHTML(){return `<div class="empty"><div class="spin" style="margin:0 auto 10px;color:var(--blue)"></div>Loading live stock…</div>`}
+
+/* ---- home ---- */
+function homeV(v){
+  const L=S.items.filter(live),units=L.reduce((a,i)=>a+q(i),0),free=L.filter(i=>(i.status||'In stock')==='In stock').reduce((a,i)=>a+q(i),0),groups=new Set(L.map(groupOf)).size;
+  const byLoc={};L.forEach(i=>{byLoc[i.locationId]=(byLoc[i.locationId]||0)+q(i)});const maxL=Math.max(1,...Object.values(byLoc));
+  const byCat={};L.forEach(i=>{const c=i.category||'Other';byCat[c]=(byCat[c]||0)+q(i)});const maxC=Math.max(1,...Object.values(byCat));
+  const recent=[...S.items].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).slice(0,5);
+  const sv=isAdmin()?buyTable().reduce((a,b)=>a+b.stockValue,0):0;
+  v.innerHTML=`
+  <div class="stats">
+    <div class="stat hero"><div class="v num">${units}</div><div class="l">Machines in stock</div></div>
+    <div class="stat"><div class="v num">${free}</div><div class="l">Free to sell</div></div>
+    <div class="stat"><div class="v num">${groups}</div><div class="l">Machine groups</div></div>
+    ${isAdmin()?`<div class="stat"><div class="v num" style="font-size:22px">${sv?inr(sv):'—'}</div><div class="l">Stock value at cost <span class="lock">ADMIN</span></div></div>`:`<div class="stat"><div class="v num">${S.locations.length}</div><div class="l">Showrooms &amp; warehouses</div></div>`}
+  </div>
+  <button class="cta" data-go="snap"><div class="ic">${IC.cam}</div><div><b>Snap a machine</b><span>Photo → AI reads type, size &amp; nameplate → added to stock</span></div></button>
+  <button class="cta" data-gosale="1" style="background:linear-gradient(120deg,var(--ok),#146A3A);margin-top:-2px"><div class="ic">${IC.sell}</div><div><b>Snap a sales invoice</b><span>AI reads client details &amp; machines sold → stock out + client saved</span></div></button>
+  ${isAdmin()?`<button class="cta" data-goinv="1" style="background:linear-gradient(120deg,var(--blue),var(--blue-d));margin-top:-2px"><div class="ic">${IC.buy}</div><div><b>Snap a purchase invoice</b><span>AI reads supplier, items &amp; rates → buy prices + stock in</span></div></button>`:''}
+  <div class="h">By location <button data-go="places">All places</button></div>
+  <div class="card" style="padding:4px 14px">${sortedLocs().length?sortedLocs().map(l=>`<button class="bar-row" data-loc="${esc(l.id)}"><div class="nm"><span class="t">${esc(l.name)}</span><span class="tag ${l.kind==='warehouse'?'wh':''}">${l.kind==='warehouse'?'WH':'SR'}</span></div><div class="num">${byLoc[l.id]||0}</div><div class="bar"><i style="width:${((byLoc[l.id]||0)/maxL*100).toFixed(0)}%"></i></div></button>`).join(''):`<div class="empty">No locations yet.</div>`}</div>
+  <div class="h">By category</div>
+  <div class="card" style="padding:4px 14px">${Object.keys(byCat).length?Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<button class="bar-row" data-cat="${esc(c)}"><div class="nm"><span class="t">${esc(c)}</span></div><div class="num">${n}</div><div class="bar"><i style="width:${(n/maxC*100).toFixed(0)}%;background:var(--red)"></i></div></button>`).join(''):`<div class="empty"><b>No stock yet</b>Tap the red camera and snap your first machine.</div>`}</div>
+  <div class="h">Ask the stock</div>
+  <div class="card"><div class="row"><input id="askQ" class="inp" placeholder="${isAdmin()?'e.g. What did we pay for 6 ft lathes?':'e.g. Where do we have 8 ft lathes?'}" enterkeyhint="send"><button id="askBtn" class="btn">Ask</button></div><div id="askA" class="answer"></div></div>
+  ${recent.length?`<div class="h">Recently updated <button data-go="log">All moves</button></div><div class="grp">${recent.map(itemRow).join('')}</div>`:''}
+  <div class="foot">TL Pathak Group · Think Machines, Think Us.${MODE==='sheet'?' · synced with your Google Sheet':''}</div>`;
+}
+function itemRow(i){return `<button class="it" data-item="${esc(i.id)}"><div class="th" style="${cssUrl(i.photos&&i.photos[0])}"></div><div class="tx"><b>${esc(i.name||groupOf(i))}</b><small>${esc(locNm(i.locationId))}${i.model?' · '+esc(i.model):''}${i.serial?' · SN '+esc(i.serial):''}</small></div>${stBadge(i.status)}<div class="qty">×${q(i)}</div></button>`}
+
+/* ---- stock ---- */
+function stockV(v){
+  const cats=[...new Set(S.items.map(i=>i.category||'Other'))];
+  v.innerHTML=`<div class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A919C" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="sq" placeholder="Search lathe, 6 ft, model, serial…" value="${esc(ui.q)}" autocomplete="off"></div>
+  <div class="row" style="margin-bottom:8px"><select id="sloc" class="sel"><option value="all">All locations</option>${sortedLocs().map(l=>`<option value="${esc(l.id)}" ${ui.fLoc===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select><button class="chip ${ui.showSold?'on':''}" id="ssold">Sold too</button></div>
+  <div class="chips"><button class="chip ${ui.fCat==='all'?'on':''}" data-fcat="all">All</button>${cats.map(c=>`<button class="chip ${ui.fCat===c?'on':''}" data-fcat="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+  <div id="list"></div><div class="row" style="justify-content:center;margin-top:14px"><button class="btn ghost" id="copyList">Copy list for Excel / WhatsApp</button></div>`;
+  renderList();
+}
+function filtered(){const t=ui.q.toLowerCase().trim().split(/\s+/).filter(Boolean);return S.items.filter(i=>{if(!ui.showSold&&!live(i))return false;if(ui.fLoc!=='all'&&i.locationId!==ui.fLoc)return false;if(ui.fCat!=='all'&&(i.category||'Other')!==ui.fCat)return false;if(t.length){const hay=[i.name,groupOf(i),i.type,i.size,i.brand,i.model,i.serial,i.category,locNm(i.locationId),i.notes,...(i.specs||[]).map(s=>s.label+' '+s.value)].join(' ').toLowerCase();if(!t.every(w=>hay.includes(w)))return false}return true})}
+function renderList(){
+  const el=$('#list');if(!el)return;const F=filtered();
+  if(!F.length){el.innerHTML=`<div class="empty"><b>${S.items.length?'Nothing matches':'No stock yet'}</b>${S.items.length?'Try another search or location.':'Tap the red camera to snap your first machine.'}</div>`;return}
+  const cats={};F.forEach(i=>{const c=i.category||'Other',g=groupOf(i);(cats[c]=cats[c]||{});(cats[c][g]=cats[c][g]||[]).push(i)});
+  const bt=isAdmin()?Object.fromEntries(buyTable().map(b=>[b.group,b])):{};
+  el.innerHTML=Object.keys(cats).sort((a,b)=>CATS.indexOf(a)-CATS.indexOf(b)).map(c=>{const gs=cats[c];const tot=Object.values(gs).flat().reduce((a,i)=>a+q(i),0);
+    return `<div class="cat-h"><span>${esc(c)}</span><span class="num">${tot}</span></div>`+Object.entries(gs).sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(([g,arr])=>{
+      const n=arr.reduce((a,i)=>a+q(i),0),per={};arr.forEach(i=>{const k=shortLoc(i.locationId);per[k]=(per[k]||0)+q(i)});const ph=arr.find(i=>i.photos&&i.photos[0]);const key=c+'|'+g;const b=bt[g];
+      return `<div class="grp"><button class="grp-h" data-grp="${esc(key)}"><div class="th" style="${ph?cssUrl(ph.photos[0]):''}">${ph?'':IC.box}</div><div class="tx"><b>${esc(g)}</b><small>${Object.entries(per).map(([k,v])=>esc(k)+' '+v).join(' · ')}</small>${b?`<small style="color:var(--warn)">${b.listOnly?'List net '+inr(b.pl.net):'Buy '+inr(b.last)} · ${esc(b.supplier)}</small>`:''}</div><div class="ct"><div class="num">${n}</div><small>units</small></div></button>${ui.open[key]?`<div class="grp-b">${arr.sort((a,b)=>locNm(a.locationId).localeCompare(locNm(b.locationId))).map(itemRow).join('')}</div>`:''}</div>`}).join('')}).join('');
+}
+function copyText(t,msg){try{navigator.clipboard.writeText(t).then(()=>toast(msg)).catch(()=>toast('Copy blocked on this device'))}catch(e){toast('Copy blocked on this device')}}
+
+/* ---- snap ---- */
+function snapV(v){
+  const seg=`<div class="seg"><button data-smode="machine" class="${ui.snapMode==='machine'?'on':''}">📷 Machine</button><button data-smode="sale" class="${ui.snapMode==='sale'?'on':''}">Sales bill</button>${isAdmin()?`<button data-smode="inv" class="${ui.snapMode==='inv'?'on':''}">Purchase bill</button>`:''}</div>`;
+  if(ui.snapMode==='inv'&&isAdmin()){v.innerHTML=seg+invHTML();return}
+  if(ui.snapMode==='sale'){v.innerHTML=seg+saleHTML();return}
+  v.innerHTML=seg+machineHTML();
+}
+function aiNote(){
+  if(MODE==='claude'&&K.sample===null)return `<div class="ai-box lo"><div>ℹ️</div><div>AI photo reading isn’t available in this view — you can still add photos and type the details.</div></div>`;
+  if(MODE==='claude'&&K.aiImages===false)return `<div class="ai-box lo"><div>ℹ️</div><div>This Claude app view can’t send photos to AI. Photos still save; for AI reading open this page on claude.ai in a browser.</div></div>`;
+  return '';
+}
+function machineHTML(){
+  if(!snap.active)return `<div class="card snap-hero">
+      <label class="bigcam" for="mPick" aria-label="Take or choose a photo">${IC.cam}</label>
+      <h2>Snap a machine</h2>
+      <p>Tap the camera → <b>Take Photo</b>. AI reads the type, size &amp; nameplate and files it under the right group.<br>Tip: add a 2nd photo of the nameplate for exact model &amp; serial.</p>
+      <div class="row" style="justify-content:center;flex-wrap:wrap"><label class="btn ghost" for="mCam">Open camera</label><label class="btn ghost" for="mGal">From gallery</label><button class="btn ghost" id="manualGo">Type it in</button></div>
+    </div>${aiNote()}
+    <div class="muted" style="text-align:center">Adding at: <b>${esc(locById(myLoc())?.name||'— pick 📍 at the top —')}</b></div>`;
+  const f=snap.form,match=findMatch();let ai='';
+  if(snap.busy)ai=`<div class="ai-box busy"><div class="spin"></div><div><b>Reading the machine…</b><br>${MODE==='claude'?'The first time, Claude asks you to “Allow” — tap it.':'Checking type, size and nameplate.'}</div></div>`;
+  else if(snap.err)ai=`<div class="ai-box err"><div>⚠️</div><div>${esc(snap.err)}</div></div>`;
+  else if(snap.aiDone)ai=`<div class="ai-box ${f.confidence==='low'?'lo':'ok'}"><div>${f.confidence==='low'?'🤔':'✅'}</div><div><b>${f.confidence==='high'?'Identified':'Best guess'}${f.confidence?' ('+esc(f.confidence)+' confidence)':''}</b> — check and fix anything below.${f.tip?'<br>'+esc(f.tip):''}</div></div>`;
+  const bp=buyFor(f.group);
+  return `${!snap.manual||snap.photos.length?`<div class="photos">${snap.photos.map((p,ix)=>`<div class="ph" style="${cssUrl(p.thumb)}"><button data-rmph="${ix}" aria-label="Remove">×</button></div>`).join('')}${snap.photos.length<3?`<label class="ph add" for="mPick">＋<br>Nameplate /<br>another angle</label>`:''}</div>`:''}
+  ${ai}${!snap.busy&&!snap.aiDone&&!snap.err?aiNote():''}
+  ${snap.photos.length&&!snap.busy?`<div class="row" style="margin:-4px 0 12px"><button class="btn soft" id="reread">↻ Read ${snap.aiDone||snap.err?'again':'with AI'}${snap.photos.length>1?' (all photos)':''}</button></div>`:''}
+  ${match?`<div class="match">Already in stock here: <b>${esc(match.name||groupOf(match))}</b> × ${q(match)}<div class="row"><button class="btn" id="addToMatch">Add ${f.qty} to it → ${q(match)+(+f.qty||1)}</button></div></div>`:''}
+  ${bp?`<div class="buyline">🔒 ${bp.listOnly?`Price list net <b>${inr(bp.pl.net)}</b> (${esc(bp.pl.mfr)})`:`Last bought at <b>${inr(bp.last)}</b> from ${esc(bp.supplier)} (${esc(fdate(bp.date))})`}</div>`:''}
+  <div class="card">
+    <label class="fld"><span>Machine name</span><input class="inp" data-f="name" value="${esc(f.name)}" placeholder="e.g. 6 ft All-Geared Lathe Machine"></label>
+    <div class="grid2"><label class="fld"><span>Type</span><input class="inp" data-f="type" value="${esc(f.type)}" placeholder="All-Geared Lathe"></label><label class="fld"><span>Size</span><input class="inp" data-f="size" value="${esc(f.size)}" placeholder="6 ft"></label></div>
+    <label class="fld"><span>Group (same group = counted together)</span><input class="inp" data-f="group" id="fGroup" value="${esc(f.group)}" list="grpList" placeholder="All-Geared Lathe · 6 ft"></label>
+    <datalist id="grpList">${allGroups().map(g=>`<option value="${esc(g)}">`).join('')}</datalist>
+    <div class="grid2">
+      <label class="fld"><span>Category</span><select class="sel" data-f="category">${CATS.map(c=>`<option ${c===f.category?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+      <label class="fld"><span>Condition</span><select class="sel" data-f="condition">${COND.map(c=>`<option ${c===f.condition?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+      <label class="fld"><span>Brand</span><input class="inp" data-f="brand" value="${esc(f.brand)}"></label>
+      <label class="fld"><span>Model</span><input class="inp" data-f="model" value="${esc(f.model)}"></label>
+    </div>
+    <label class="fld"><span>Serial no. (blank for bulk items)</span><input class="inp" data-f="serial" value="${esc(f.serial)}"></label>
+    <div class="fld"><span>Key specs</span><div>${f.specs.map((s,ix)=>`<div class="spec"><input class="inp" data-si="${ix}" data-sk="label" value="${esc(s.label)}" placeholder="Label"><input class="inp" data-si="${ix}" data-sk="value" value="${esc(s.value)}" placeholder="Value"><button data-rmspec="${ix}" aria-label="Remove">×</button></div>`).join('')}</div><button class="btn soft" id="addSpec" style="padding:8px 12px;font-size:14px">＋ Add spec</button></div>
+  </div>
+  <div class="card">
+    <label class="fld"><span>Location</span><select class="sel" data-f="locationId">${locOptions(f.locationId,'— Choose showroom / warehouse —')}</select></label>
+    <div class="grid2"><div class="fld"><span>Quantity</span><div class="stepper"><button id="qm">−</button><input id="qv" inputmode="numeric" value="${esc(f.qty)}"><button id="qp">+</button></div></div>
+    <label class="fld"><span>Status</span><select class="sel" data-f="status">${STATUS.filter(s=>s!=='Sold').map(s=>`<option ${s===f.status?'selected':''}>${esc(s)}</option>`).join('')}</select></label></div>
+    <label class="fld"><span>Notes</span><input class="inp" data-f="notes" value="${esc(f.notes)}" placeholder="Bay no., accessories, paint colour…"></label>
+  </div>
+  <button class="btn red block" id="saveSnap" ${snap.busy?'disabled':''} style="padding:15px;font-size:17px">Save to stock</button>
+  <button class="btn ghost block" id="cancelSnap" style="margin-top:8px">Cancel</button>`;
+}
+function findMatch(){const f=snap.form;if(!f.locationId||!f.group||f.serial)return null;return S.items.find(i=>live(i)&&i.locationId===f.locationId&&groupOf(i).toLowerCase()===f.group.toLowerCase()&&(i.model||'').toLowerCase()===(f.model||'').toLowerCase()&&!i.serial&&(i.status||'In stock')===f.status&&(i.condition||'New')===f.condition)||null}
+
+/* ---- invoice capture (admin) ---- */
+function invHTML(){
+  if(!inv.active)return `<div class="card snap-hero">
+      <label class="bigcam" for="iPick" style="background:var(--blue);box-shadow:0 12px 30px rgba(20,70,160,.35),0 0 0 10px var(--blue-l)" aria-label="Photograph invoice">${IC.buy.replace('<svg','<svg width="60" height="60"')}</label>
+      <h2>Snap a purchase invoice</h2>
+      <p>Photograph each page flat and in good light. AI reads the supplier, GSTIN, items, rates and totals. The invoice is stored for you, and its rates become your <b>buy prices</b>. <span class="lock">ADMIN ONLY</span></p>
+      <div class="row" style="justify-content:center;flex-wrap:wrap"><label class="btn ghost" for="iCam">Open camera</label><button class="btn ghost" id="invManual">Type it in</button></div>
+    </div>${aiNote()}`;
+  const f=inv.f;let ai='';
+  if(inv.busy)ai=`<div class="ai-box busy"><div class="spin"></div><div><b>Reading the invoice…</b><br>Supplier, items, rates and GST — takes 10–40 s.</div></div>`;
+  else if(inv.err)ai=`<div class="ai-box err"><div>⚠️</div><div>${esc(inv.err)}</div></div>`;
+  else if(inv.aiDone)ai=`<div class="ai-box ${f.confidence==='low'?'lo':'ok'}"><div>${f.confidence==='low'?'🤔':'✅'}</div><div><b>Read ${f.lines.length} line${f.lines.length===1?'':'s'}</b> — check every number before saving.${f.notes?'<br>'+esc(f.notes):''}</div></div>`;
+  const sub=f.lines.reduce((a,l)=>a+num(l.amount),0),calc=sub+num(f.tax)+num(f.freight),diff=num(f.total)&&Math.abs(calc-num(f.total))>Math.max(2,num(f.total)*0.005);
+  return `<div class="photos">${inv.photos.map((p,ix)=>`<div class="ph" style="${cssUrl(p.thumb)}"><button data-rmip="${ix}" aria-label="Remove">×</button></div>`).join('')}${inv.photos.length<4?`<label class="ph add" for="iPick">＋<br>Next page</label>`:''}</div>
+  ${ai}${!inv.busy&&!inv.aiDone&&!inv.err?aiNote():''}
+  ${inv.photos.length&&!inv.busy?`<div class="row" style="margin:-4px 0 12px"><button class="btn soft" id="rereadInv">↻ Read ${inv.aiDone||inv.err?'again':'with AI'}${inv.photos.length>1?' (all pages)':''}</button></div>`:''}
+  <div class="card">
+    <label class="fld"><span>Supplier</span><input class="inp" data-if="supplier" value="${esc(f.supplier)}"></label>
+    <div class="grid2"><label class="fld"><span>Invoice no.</span><input class="inp" data-if="invoiceNo" value="${esc(f.invoiceNo)}"></label><label class="fld"><span>Date</span><input class="inp" type="date" data-if="date" value="${esc(f.date)}"></label></div>
+    <label class="fld"><span>Supplier GSTIN</span><input class="inp" data-if="gstin" value="${esc(f.gstin)}" style="text-transform:uppercase"></label>
+    <label class="fld"><span>Received at</span><select class="sel" data-if="locationId">${locOptions(f.locationId,'— Choose showroom / warehouse —')}</select></label>
+  </div>
+  <div class="h">Items <button id="addLine">＋ Add line</button></div>
+  ${f.lines.map((l,ix)=>`<div class="line"><div class="top2"><b>#${ix+1}</b><input class="inp" style="flex:1" data-li="${ix}" data-lk="desc" value="${esc(l.desc)}" placeholder="Description"><button data-rmline="${ix}" style="color:var(--ink3);font-size:20px" aria-label="Remove">×</button></div>
+    <div class="g3"><div><small>Qty</small><input class="inp" inputmode="decimal" data-li="${ix}" data-lk="qty" value="${esc(l.qty)}"></div><div><small>Rate (ex-GST)</small><input class="inp" inputmode="decimal" data-li="${ix}" data-lk="rate" value="${esc(l.rate)}"></div><div><small>GST %</small><input class="inp" inputmode="decimal" data-li="${ix}" data-lk="gst" value="${esc(l.gst)}"></div></div>
+    <small>Stock group (for buy price &amp; stock)</small><input class="inp" data-li="${ix}" data-lk="group" value="${esc(l.group)}" list="grpList3" placeholder="e.g. All-Geared Lathe · 6 ft — blank for spares">
+    <div class="row" style="justify-content:space-between;margin-top:6px"><label class="chk"><input type="checkbox" data-li="${ix}" data-lk="addStock" ${l.addStock?'checked':''}> Add ${esc(Math.round(num(l.qty))||'')} to stock</label><span class="rupee" id="amt${ix}">${inr(l.amount)}</span></div></div>`).join('')||'<div class="empty" style="padding:14px">No lines yet — read with AI or add a line.</div>'}
+  <datalist id="grpList3">${allGroups().map(g=>`<option value="${esc(g)}">`).join('')}</datalist>
+  <div class="card"><div class="tot">
+    <span>Taxable value</span><b class="rupee" id="invSub">${inr(sub)}</b>
+    <span>GST total</span><input class="inp" inputmode="decimal" data-if="tax" value="${esc(f.tax)}">
+    <span>Freight / other</span><input class="inp" inputmode="decimal" data-if="freight" value="${esc(f.freight)}">
+    <span>Invoice total</span><input class="inp" inputmode="decimal" data-if="total" value="${esc(f.total)}">
+  </div><div id="invWarn" class="muted" style="margin-top:8px;color:var(--red)">${diff?`⚠️ Lines + GST + freight = ${inr(calc)}, but invoice total says ${inr(f.total)}. Check the numbers.`:''}</div>
+  <label class="fld" style="margin-top:10px"><span>Notes</span><input class="inp" data-if="notes" value="${esc(f.notes)}"></label></div>
+  <button class="btn block" id="saveInv" ${inv.busy||inv.saving?'disabled':''} style="padding:15px;font-size:17px;background:var(--blue-d)">${inv.saving?'Saving…':'Save invoice'+(f.lines.some(l=>l.addStock&&l.group)?' + add to stock':'')}</button>
+  <button class="btn ghost block" id="cancelInv" style="margin-top:8px">Cancel</button>`;
+}
+function invTotals(){const f=inv.f;f.lines.forEach((l,ix)=>{l.amount=+(num(l.qty)*num(l.rate)).toFixed(2);const a=$('#amt'+ix);if(a)a.textContent=inr(l.amount)});const sub=f.lines.reduce((a,l)=>a+num(l.amount),0),calc=sub+num(f.tax)+num(f.freight);const s=$('#invSub');if(s)s.textContent=inr(sub);const w=$('#invWarn');if(w)w.textContent=num(f.total)&&Math.abs(calc-num(f.total))>Math.max(2,num(f.total)*0.005)?`⚠️ Lines + GST + freight = ${inr(calc)}, but invoice total says ${inr(f.total)}. Check the numbers.`:''}
+async function saveInv(){
+  const f=inv.f;
+  if(!inv.photos.length&&!f.lines.length){toast('Add a photo or a line first');return}
+  if(!f.supplier){toast('Supplier name needed');return}
+  if(f.lines.some(l=>l.addStock&&l.group)&&!f.locationId){toast('Choose where the goods were received');return}
+  invTotals();
+  const rec={supplier:f.supplier.trim(),gstin:(f.gstin||'').toUpperCase().trim(),invoiceNo:f.invoiceNo.trim(),date:f.date,locationId:f.locationId,
+    lines:f.lines.filter(l=>l.desc||l.group||num(l.amount)).map(l=>({desc:l.desc,hsn:l.hsn||'',qty:num(l.qty),unit:l.unit||'Nos',rate:num(l.rate),amount:num(l.amount),gst:num(l.gst),group:(l.group||'').trim(),addStock:!!l.addStock})),
+    subtotal:f.lines.reduce((a,l)=>a+num(l.amount),0),tax:num(f.tax),freight:num(f.freight),total:num(f.total)||0,notes:f.notes||''};
+  if(!rec.total)rec.total=+(rec.subtotal+rec.tax+rec.freight).toFixed(2);
+  const dup=S.purchases.find(p=>p.invoiceNo&&rec.invoiceNo&&p.invoiceNo.toLowerCase()===rec.invoiceNo.toLowerCase()&&(p.supplier||'').toLowerCase()===rec.supplier.toLowerCase());
+  if(dup&&!inv.dupOk){inv.dupOk=true;toast('This invoice no. from this supplier is already saved. Tap Save again to save anyway.');return}
+  inv.saving=true;renderView();
+  const ok=await act('savePurchase',{rec,photos:inv.photos},'Invoice saved ✓'+(rec.lines.some(l=>l.addStock&&l.group)?' · stock added':''));
+  inv.saving=false;if(ok){inv=newInv();ui.view='buy';ui.buyMode='inv'}renderView();
+}
+
+/* ---- buy (admin) ---- */
+function buyV(v){
+  const modes=isAdmin()?[['sales','Sales'],['inv','Buys'],['lists','Lists'],['prices','Costs'],['clients','Clients']]:[['sales','Sales'],['clients','Clients']];
+  if(!modes.some(m=>m[0]===ui.buyMode))ui.buyMode='sales';
+  const seg=`<div class="seg">${modes.map(([k,l])=>`<button data-bmode="${k}" class="${ui.buyMode===k?'on':''}">${l}</button>`).join('')}</div>`;
+  const t=ui.bq.toLowerCase().trim();
+  const ph={sales:'Client, invoice no., machine, serial…',inv:'Supplier, invoice no., item…',clients:'Name, phone, GSTIN, city…',prices:'Machine group, supplier…',lists:'Search all price lists: model, size, maker…'}[ui.buyMode];
+  const head=`${seg}<div class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A919C" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="bq" placeholder="${ph}" value="${esc(ui.bq)}" autocomplete="off"></div>`;
+  if(ui.buyMode==='sales')return salesV(v,head,t);
+  if(ui.buyMode==='clients')return clientsV(v,head,t);
+  if(ui.buyMode==='lists')return listsV(v,head,t);
+  if(ui.buyMode==='prices'){
+    const B=buyTable().filter(b=>!t||(b.group+' '+b.supplier).toLowerCase().includes(t));
+    v.innerHTML=head+`<div class="buyline">🔒 Only admins see this. Rates are per unit before GST; “landed” adds the invoice’s freight share; “price list” is the cheapest net price from your manufacturers’ lists.</div>`+(B.length?B.map(b=>b.listOnly?`<div class="bp"><div class="r1"><b>${esc(b.group)}</b><span class="rupee" style="font-size:18px;color:var(--ink2)">${inr(b.pl.net)}</span></div><div class="r2"><span>Price list only · ${esc(b.pl.mfr)}${b.pl.model?' '+esc(b.pl.model):''}</span><span>List <b>${inr(b.pl.list)}</b></span>${b.stock?`<span>In stock <b>${b.stock}</b></span>`:''}${lastSold(b)}</div></div>`:`<div class="bp"><div class="r1"><b>${esc(b.group)}</b><span class="rupee" style="font-size:18px;color:var(--blue-d)">${inr(b.last)}</span></div><div class="r2">${b.pl?`<span>Price list <b>${inr(b.pl.net)}</b> (${esc(b.pl.mfr)})</span>`:''}<span>Landed <b>${inr(b.lastLanded)}</b></span><span>Avg <b>${inr(b.avg)}</b></span><span>Lowest <b>${inr(b.min)}</b></span><span>${esc(b.supplier)} · ${esc(fdate(b.date))}</span><span>${b.buys} buy${b.buys>1?'s':''} · ${b.qtyBought} units</span>${b.stock?`<span>In stock <b>${b.stock}</b> ≈ ${inr(b.stockValue)}</span>`:''}${lastSold(b)}</div></div>`).join(''):`<div class="empty"><b>No buy prices yet</b>Snap a purchase invoice and set each machine line’s stock group.</div>`)+
+    `<div class="row" style="justify-content:center;margin-top:12px"><button class="btn ghost" id="copyBuy">Copy buy prices for dashboard / Excel</button></div>`;
+    return;
+  }
+  const P=[...S.purchases].sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.createdAt||0)-(a.createdAt||0)).filter(p=>!t||[p.supplier,p.invoiceNo,p.gstin,...(p.lines||[]).map(l=>l.desc+' '+l.group)].join(' ').toLowerCase().includes(t));
+  const month=new Date().toISOString().slice(0,7),mt=S.purchases.filter(p=>String(p.date).startsWith(month)).reduce((a,p)=>a+num(p.total),0);
+  v.innerHTML=head+`<div class="stats" style="grid-template-columns:1fr 1fr;margin-bottom:12px"><div class="stat hero"><div class="v num" style="font-size:22px">${inr(mt)}</div><div class="l">Bought this month</div></div><div class="stat"><div class="v num">${S.purchases.length}</div><div class="l">Invoices stored</div></div></div>
+  <button class="btn block" data-goinv="1" style="margin-bottom:12px;background:var(--blue-d)">🧾 Snap a new invoice</button>`+
+  (P.length?P.map(p=>`<button class="inv" data-pur="${esc(p.id)}"><div class="th" style="${cssUrl((p.images||[])[0])}"></div><div class="tx"><b>${esc(p.supplier||'Supplier')}</b><small>Inv ${esc(p.invoiceNo||'—')} · ${esc(fdate(p.date))} · ${esc(locNm(p.locationId))}</small><small>${(p.lines||[]).length} item${(p.lines||[]).length===1?'':'s'}: ${esc((p.lines||[]).slice(0,2).map(l=>l.desc).join(', '))}</small></div><span class="rupee">${inr(p.total)}</span></button>`).join(''):`<div class="empty"><b>No invoices yet</b>Snap your first purchase invoice.</div>`);
+}
+function openPurchase(id){
+  const p=S.purchases.find(x=>x.id===id);if(!p)return;
+  openSheet(`<div class="sh-t">${esc(p.supplier||'Supplier')}</div><div class="sh-s">Invoice ${esc(p.invoiceNo||'—')} · ${esc(fdate(p.date))}${p.gstin?' · GSTIN '+esc(p.gstin):''}<br>Received at ${esc(locNm(p.locationId))} · saved by ${esc(who(p.by))} ${esc(ago(p.createdAt))}</div>
+   ${(p.images||[]).length?`<div class="pages">${p.images.filter(okUrl).map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener" style="${cssUrl(u)}" aria-label="Open page"></a>`).join('')}</div><div class="muted" style="margin:-6px 0 10px">Tap a page to open it full size.</div>`:''}
+   <div class="card" style="padding:8px 10px;overflow-x:auto"><table class="tbl"><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr>
+   ${(p.lines||[]).map(l=>`<tr><td>${esc(l.desc)}${l.group?`<br><span class="pill">${esc(l.group)}</span>`:''}${l.gst?` <small class="muted">GST ${esc(l.gst)}%</small>`:''}</td><td class="n">${esc(l.qty)}</td><td class="n">${inr(l.rate)}</td><td class="n">${inr(l.amount)}</td></tr>`).join('')}
+   </table></div>
+   <div class="card"><div class="tot"><span>Taxable value</span><b class="rupee">${inr(p.subtotal)}</b><span>GST</span><b class="rupee">${inr(p.tax)}</b><span>Freight / other</span><b class="rupee">${inr(p.freight)}</b><span><b>Total</b></span><b class="big">${inr(p.total)}</b></div>${p.notes?`<div class="muted" style="margin-top:8px">${esc(p.notes)}</div>`:''}</div>
+   <button class="btn ghost block" id="delPur" data-id="${esc(p.id)}" style="color:var(--red)">${IC.del.replace('<svg','<svg width="18" height="18"')} Delete invoice record</button>
+   <div class="foot">Deleting removes the record and its buy prices. Stock it added stays — adjust stock separately.</div>`);
+}
+
+/* ---- log ---- */
+function logV(v){
+  const L=S.log.filter(e=>ui.logLoc==='all'||e.to===ui.logLoc||e.from===ui.logLoc);
+  const icon={add:['add','＋'],move:['move','→'],sell:['sell','₹'],edit:['edit','✎'],reserve:['edit','🔖'],remove:['sell','−'],delete:['sell','🗑'],purchase:['add','🧾'],sale:['sell','🧾']};
+  const verb=e=>{const it=`<b>${esc(e.qty?e.qty+' × ':'')}${esc(e.itemName||'item')}</b>`;switch(e.action){case 'add':return `${it} added at ${esc(locNm(e.to))}`;case 'move':return `${it} moved ${esc(locNm(e.from))} → ${esc(locNm(e.to))}`;case 'sell':return `${it} sold from ${esc(locNm(e.from))}`;case 'remove':return `${it} removed at ${esc(locNm(e.from))}`;case 'reserve':return `${it} ${String(e.note).startsWith('Released')?'released':'reserved'} at ${esc(locNm(e.from))}`;case 'delete':return `${it} deleted`;case 'purchase':return `Purchase invoice recorded: ${it}`;case 'sale':return `Sale recorded: ${it}`;default:return `${it} updated`}};
+  v.innerHTML=`<div class="h">Stock movements</div><select id="logLoc" class="sel" style="margin-bottom:10px"><option value="all">All locations</option>${sortedLocs().map(l=>`<option value="${esc(l.id)}" ${ui.logLoc===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select>
+  <div class="card" style="padding:2px 14px">${L.length?L.map(e=>{const [c,s]=icon[e.action]||icon.edit;return `<div class="lg"><div class="ic ${c}">${s}</div><div>${verb(e)}${e.note&&e.action!=='reserve'?` — ${esc(e.note)}`:e.action==='reserve'&&e.note&&!String(e.note).startsWith('Released')?` — ${esc(e.note)}`:''}<small>${esc(who(e.by))} · ${esc(ago(e.at))}</small></div></div>`}).join(''):`<div class="empty">No movements yet.</div>`}</div><div class="foot">Latest 150 movements.</div>`;
+}
+
+/* ---- places ---- */
+function placesV(v){
+  const L=S.items.filter(live);
+  v.innerHTML=`<div class="h">Showrooms &amp; warehouses ${isAdmin()?'<button id="addLoc">＋ Add</button>':''}</div>
+  ${sortedLocs().map(l=>{const its=L.filter(i=>i.locationId===l.id);const n=its.reduce((a,i)=>a+q(i),0);const g=new Set(its.map(groupOf)).size;
+    return `<div class="card" style="display:flex;align-items:center;gap:12px"><button style="flex:1;text-align:left" data-loc="${esc(l.id)}"><div style="display:flex;gap:8px;align-items:center"><b style="font-size:17px">${esc(l.name)}</b><span class="tag ${l.kind==='warehouse'?'wh':''}">${l.kind==='warehouse'?'Warehouse':'Showroom'}</span></div><div class="muted">${esc(l.city||'')}${l.city?' · ':''}${g} groups${l.id===myLoc()?' · <b style="color:var(--red)">You are here</b>':''}</div></button><div class="num" style="font-size:24px;color:var(--blue)">${n}</div>${isAdmin()?`<button class="btn ghost" style="padding:8px 10px" data-editloc="${esc(l.id)}">${IC.edit.replace('<svg','<svg width="18" height="18"')}</button>`:''}</div>`}).join('')||`<div class="empty"><b>No locations yet</b></div>`}
+  ${isAdmin()&&MODE==='sheet'?`<div class="card"><div class="h" style="margin-top:0">Staff setup link</div><div class="muted" style="margin-bottom:8px">Send to a branch — connects their phone and sets their location in one tap.</div><select class="sel" id="linkLoc">${locOptions('','Any location')}</select><button class="btn soft block" id="copyLink" style="margin-top:8px">Copy setup link</button></div>`:''}
+  ${!isAdmin()?'<div class="foot">Only admins can add or rename locations.</div>':''}`;
+}
+
+/* ================= sheets ================= */
+let sheetItem=null;
+function openSheet(html){$('#sheetCard').innerHTML='<div class="grab"></div>'+html;$('#sheet').classList.remove('hidden');$('#sheetCard').scrollTop=0}
+function closeSheet(){$('#sheet').classList.add('hidden');$('#sheetCard').innerHTML='';sheetItem=null}
+function openItem(id){
+  const i=S.items.find(x=>x.id===id);if(!i){closeSheet();return}sheetItem=id;const bp=buyFor(groupOf(i));
+  openSheet(`${i.photos&&i.photos[0]?`<div class="hero-img" style="${cssUrl(i.photos[0])}"></div>`:''}${i.photos&&i.photos[1]?`<div class="hero-img" style="${cssUrl(i.photos[1])};aspect-ratio:16/9"></div>`:''}
+   <div class="sh-t">${esc(i.name||groupOf(i))}</div><div class="sh-s">${esc(groupOf(i))} · ${esc(i.category||'')}</div>
+   ${bp?`<div class="buyline">🔒 ${bp.listOnly?`Price list net <b>${inr(bp.pl.net)}</b> · ${esc(bp.pl.mfr)}`:`Buy price <b>${inr(bp.last)}</b> (landed ${inr(bp.lastLanded)}) · ${esc(bp.supplier)}, ${esc(fdate(bp.date))} · avg ${inr(bp.avg)}${bp.pl?` · list net ${inr(bp.pl.net)}`:''}`}</div>`:''}
+   <div class="card"><dl class="kv" style="margin:0">
+     <dt>Location</dt><dd>${esc(locNm(i.locationId))}</dd><dt>Quantity</dt><dd class="num" style="font-size:18px">${q(i)}</dd>
+     <dt>Status</dt><dd>${stBadge(i.status)}${i.reservedFor?' '+esc(i.reservedFor):''}</dd><dt>Condition</dt><dd>${esc(i.condition||'New')}</dd>
+     ${i.brand?`<dt>Brand</dt><dd>${esc(i.brand)}</dd>`:''}${i.model?`<dt>Model</dt><dd>${esc(i.model)}</dd>`:''}${i.serial?`<dt>Serial no.</dt><dd>${esc(i.serial)}</dd>`:''}
+     ${(i.specs||[]).map(s=>`<dt>${esc(s.label)}</dt><dd>${esc(s.value)}</dd>`).join('')}${i.notes?`<dt>Notes</dt><dd>${esc(i.notes)}</dd>`:''}
+   </dl></div>
+   <div class="acts">
+     <button class="act" data-a="move" ${live(i)?'':'disabled'}>${IC.move}Move</button><button class="act r" data-a="sell" ${live(i)?'':'disabled'}>${IC.sell}Sell</button>
+     <button class="act" data-a="reserve" ${live(i)?'':'disabled'}>${IC.res}${i.status==='Reserved'?'Release':'Reserve'}</button>
+     <button class="act" data-a="inc">${IC.plus}+1 Unit</button><button class="act" data-a="dec" ${q(i)>0?'':'disabled'}>${IC.minus}−1 Unit</button><button class="act" data-a="edit">${IC.edit}Edit</button>
+   </div>
+   <a class="btn block" style="background:#1FA855;text-decoration:none" href="${esc(waLink(i))}" target="_blank" rel="noopener">${IC.wa.replace('<svg','<svg width="20" height="20"')} Share specs on WhatsApp</a>
+   <div class="foot">Added by ${esc(who(i.addedBy))} ${esc(ago(i.createdAt))} · updated ${esc(ago(i.updatedAt))} by ${esc(who(i.updatedBy))}</div>
+   ${isAdmin()?`<button class="btn ghost block" data-a="delete" style="margin-top:10px;color:var(--red)">${IC.del.replace('<svg','<svg width="18" height="18"')} Delete record</button>`:''}`);
+}
+function waLink(i){const L=[`*TL Pathak Group* — ${i.name||groupOf(i)}`];if(i.model)L.push('Model: '+i.model);(i.specs||[]).forEach(s=>L.push(`• ${s.label}: ${String(s.value).replace(/\s*\(est\.\)/i,'')}`));L.push('Condition: '+(i.condition||'New'),'Available at our '+locNm(i.locationId),'','Think Machines, Think Us. | info@pathak.in');return 'https://wa.me/?text='+encodeURIComponent(L.join('\n'))}
+function qtyField(id,max,val){return `<div class="fld"><span>How many? (of ${max})</span><div class="stepper" style="width:max-content"><button data-step="-1" data-for="${id}">−</button><input id="${id}" inputmode="numeric" value="${val}" data-max="${max}"><button data-step="1" data-for="${id}">+</button></div></div>`}
+function readQty(id,max){return Math.min(max,Math.max(1,parseInt($('#'+id)?.value)||1))}
+function actionSheet(a){
+  const i=S.items.find(x=>x.id===sheetItem);if(!i)return;const back=`<button class="btn ghost block" style="margin-top:8px" data-back="${esc(i.id)}">Back</button>`;
+  if(a==='inc'||a==='dec')return act('adjust',{id:i.id,delta:a==='inc'?1:-1},(a==='inc'?'+1':'−1')+' ✓').then(ok=>ok&&setTimeout(()=>openItem(i.id),300));
+  if(a==='delete')return openSheet(`<div class="sh-t">Delete this record?</div><div class="sh-s">${esc(i.name)} at ${esc(locNm(i.locationId))}. Use “Sell” for sales — delete is for mistakes.</div><button class="btn red block" id="doDelete">Delete</button>${back}`);
+  if(a==='move')return openSheet(`<div class="sh-t">Move stock</div><div class="sh-s">${esc(i.name)} · now at ${esc(locNm(i.locationId))}</div><label class="fld"><span>To</span><select class="sel" id="mvTo">${locOptions('','— Choose —',i.locationId)}</select></label>${q(i)>1?qtyField('mvQ',q(i),q(i)):'<input type="hidden" id="mvQ" value="1">'}<label class="fld"><span>Mark as</span><select class="sel" id="mvSt"><option>In stock</option><option>In transit</option></select></label><label class="fld"><span>Note (truck no., challan…)</span><input class="inp" id="mvN"></label><button class="btn block" id="doMove">Move</button>${back}`);
+  if(a==='sell')return openSheet(`<div class="sh-t">Mark as sold</div><div class="sh-s">${esc(i.name)} · ${esc(locNm(i.locationId))}</div>${q(i)>1?qtyField('slQ',q(i),1):'<input type="hidden" id="slQ" value="1">'}<label class="fld"><span>Customer / invoice no.</span><input class="inp" id="slN" value="${esc(i.reservedFor||'')}"></label><button class="btn red block" id="doSell">Confirm sale</button><button class="btn soft block" style="margin-top:8px" data-gosale="1" data-fromloc="${esc(i.locationId)}">🧾 Snap the sales invoice instead (saves client too)</button>${back}`);
+  if(a==='reserve'){if(i.status==='Reserved')return act('reserve',{id:i.id,on:false},'Released ✓').then(ok=>ok&&setTimeout(()=>openItem(i.id),300));
+    return openSheet(`<div class="sh-t">Reserve for a customer</div><div class="sh-s">${esc(i.name)} · ${esc(locNm(i.locationId))}${q(i)>1?' · reserves all '+q(i)+' units of this record':''}</div><label class="fld"><span>Customer name / phone</span><input class="inp" id="rsN"></label><button class="btn block" id="doReserve">Reserve</button>${back}`)}
+  if(a==='edit')return openSheet(`<div class="sh-t">Edit</div><div class="sh-s">Changes reach every phone within seconds.</div>
+    <label class="fld"><span>Name</span><input class="inp" id="eName" value="${esc(i.name)}"></label><label class="fld"><span>Group</span><input class="inp" id="eGroup" value="${esc(groupOf(i))}" list="grpList2"></label><datalist id="grpList2">${allGroups().map(g=>`<option value="${esc(g)}">`).join('')}</datalist>
+    <div class="grid2"><label class="fld"><span>Category</span><select class="sel" id="eCat">${CATS.map(c=>`<option ${c===i.category?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label class="fld"><span>Status</span><select class="sel" id="eSt">${STATUS.map(c=>`<option ${c===(i.status||'In stock')?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+    <label class="fld"><span>Model</span><input class="inp" id="eModel" value="${esc(i.model)}"></label><label class="fld"><span>Serial no.</span><input class="inp" id="eSerial" value="${esc(i.serial)}"></label>
+    <label class="fld"><span>Condition</span><select class="sel" id="eCond">${COND.map(c=>`<option ${c===(i.condition||'New')?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label class="fld"><span>Quantity</span><input class="inp" id="eQty" inputmode="numeric" value="${q(i)}"></label></div>
+    <label class="fld"><span>Specs (one per line — Label: value)</span><textarea class="inp" id="eSpecs" rows="5">${esc((i.specs||[]).map(s=>s.label+': '+s.value).join('\n'))}</textarea></label><label class="fld"><span>Notes</span><input class="inp" id="eNotes" value="${esc(i.notes)}"></label>
+    <button class="btn block" id="doEdit">Save changes</button>${back}`);
+}
+function locSheet(id){const l=id?locById(id):null;openSheet(`<div class="sh-t">${l?'Edit location':'Add location'}</div><div class="sh-s">Shows on every phone.</div><label class="fld"><span>Name</span><input class="inp" id="lN" value="${esc(l?.name||'')}" placeholder="e.g. Dankuni Warehouse"></label><div class="grid2"><label class="fld"><span>Type</span><select class="sel" id="lK"><option value="showroom" ${l?.kind!=='warehouse'?'selected':''}>Showroom</option><option value="warehouse" ${l?.kind==='warehouse'?'selected':''}>Warehouse</option></select></label><label class="fld"><span>City</span><input class="inp" id="lC" value="${esc(l?.city||'')}"></label></div><button class="btn block" id="saveLoc" data-id="${esc(id||'')}">Save</button>${l?`<button class="btn ghost block" style="margin-top:8px;color:var(--red)" id="delLoc" data-id="${esc(id)}">Delete location</button>`:''}`)}
+function pickMyLoc(){openSheet(`<div class="sh-t">Where are you?</div><div class="sh-s">New snaps get added here. Saved on this phone.</div>${sortedLocs().map(l=>`<button class="bar-row" data-myloc="${esc(l.id)}" style="padding:13px 4px"><div class="nm"><span class="t">${esc(l.name)}</span><span class="tag ${l.kind==='warehouse'?'wh':''}">${l.kind==='warehouse'?'WH':'SR'}</span></div><div>${l.id===myLoc()?'✓':''}</div></button>`).join('')||'<div class="empty">No locations yet.</div>'}`)}
+function openSettings(){
+  if(MODE==='claude'){openSheet(`<div class="sh-t">About this app</div><div class="sh-s">Running inside Claude — stock is shared live with everyone you share this page with.</div>
+    <div class="card"><dl class="kv" style="margin:0"><dt>Your access</dt><dd>${K.canEdit?'Admin (sees buy prices)':K.canWrite?'Staff (can change stock)':'View only'}</dd><dt>AI photo reading</dt><dd>${K.sample===null?'Not available here':K.aiImages===false?'Not in this app view':'Ready'}</dd></dl></div>
+    <div class="muted">Admins = people you share with as <b>Editor</b>. Staff = <b>Contributor</b>. Purchase invoices and buy prices are visible to admins only.</div>`);return}
+  openSheet(`<div class="sh-t">Settings</div><div class="sh-s">Saved on this phone only.</div>
+  <label class="fld"><span>Your name (shown in the movement log)</span><input class="inp" id="sMe" value="${esc(CFG.me)}" placeholder="e.g. Ravi – Bengaluru"></label>
+  <label class="fld"><span>Stock server (Apps Script /exec URL)</span><input class="inp" id="sApi" value="${esc(CFG.api)}" placeholder="https://script.google.com/macros/s/…/exec"></label>
+  <label class="fld"><span>Team key</span><input class="inp" id="sTok" value="${esc(CFG.token)}"></label>
+  <label class="fld"><span>Admin PIN (buy prices, invoices, locations)</span><input class="inp" id="sPin" type="password" inputmode="numeric" value="${esc(CFG.pin)}"></label>
+  <button class="btn block" id="saveSettings">Save &amp; connect</button>`);
+}
+
+/* ================= events ================= */
+function go(v){ui.view=v;try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}renderView();window.scrollTo(0,0)}
+$('#tabs').addEventListener('click',e=>{const t=e.target.closest('.tab');if(t)go(t.dataset.v)});
+$('#locBtn').onclick=pickMyLoc;$('#setBtn').onclick=openSettings;$('#sheetBg').onclick=closeSheet;
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(VIEWS.includes(h)&&h!==ui.view){ui.view=h;renderView()}});
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('button');if(!t)return;const d=t.dataset;
+  if(d.go){go(d.go);return}
+  if(d.goinv){ui.snapMode='inv';go('snap');return}
+  if(d.gosale){ui.snapMode='sale';if(d.fromloc){sale.f.locationId=d.fromloc}closeSheet();go('snap');return}
+  if(d.sale){openSale(d.sale);return}
+  if(d.pl&&t.classList.contains('inv')){openPL(d.pl);return}
+  if(d.rmpli!==undefined){pl.f.items.splice(+d.rmpli,1);const y=window.scrollY;renderView();window.scrollTo(0,y);return}
+  if(d.client){openClient(d.client);return}
+  if(d.smode){ui.snapMode=d.smode;renderView();return}
+  if(d.bmode){ui.buyMode=d.bmode;ui.bq='';renderView();return}
+  if(d.loc!==undefined&&t.closest('#view')){ui.fLoc=d.loc;ui.fCat='all';go('stock');return}
+  if(d.cat!==undefined&&t.closest('#view')){ui.fCat=d.cat;ui.fLoc='all';go('stock');return}
+  if(d.item){openItem(d.item);return}
+  if(d.pur){openPurchase(d.pur);return}
+  if(d.grp){ui.open[d.grp]=!ui.open[d.grp];renderList();return}
+  if(d.fcat){ui.fCat=d.fcat;renderView();return}
+  switch(t.id){
+    case 'ssold':ui.showSold=!ui.showSold;renderView();return;
+    case 'copyList':{const F=filtered();copyText(['Group\tName\tLocation\tQty\tStatus\tModel\tSerial\tCondition',...F.map(i=>[groupOf(i),i.name,locNm(i.locationId),q(i),i.status||'In stock',i.model||'',i.serial||'',i.condition||''].join('\t'))].join('\n'),'Copied '+F.length+' rows');return}
+    case 'copyBuy':{const B=buyTable();copyText(['Group\tLast rate (ex-GST)\tLanded\tAverage\tLowest\tLast supplier\tLast date\tBuys\tIn stock\tStock value',...B.map(b=>[b.group,b.last,b.lastLanded,b.avg,b.min,b.supplier,b.date,b.buys,b.stock,b.stockValue].join('\t'))].join('\n'),'Copied '+B.length+' buy prices');return}
+    case 'askBtn':askStock();return;
+    case 'openSettings':openSettings();return;
+    case 'manualGo':snap=newSnap();snap.active=true;snap.manual=true;renderView();return;
+    case 'reread':identify();return;
+    case 'addSpec':snap.form.specs.push({label:'',value:''});renderView();return;
+    case 'qm':case 'qp':{const v=$('#qv');snap.form.qty=Math.max(1,(parseInt(v.value)||1)+(t.id==='qp'?1:-1));v.value=snap.form.qty;refreshMatch();return}
+    case 'saveSnap':saveSnap();return;
+    case 'addToMatch':addToMatch();return;
+    case 'cancelSnap':snap=newSnap();renderView();return;
+    case 'invManual':inv=newInv();inv.active=true;inv.f.lines=[{desc:'',qty:1,unit:'Nos',rate:0,amount:0,gst:18,group:'',addStock:false}];renderView();return;
+    case 'rereadInv':readInvoice();return;
+    case 'addLine':inv.f.lines.push({desc:'',qty:1,unit:'Nos',rate:0,amount:0,gst:18,group:'',addStock:false});renderView();return;
+    case 'saveInv':saveInv();return;
+    case 'cancelInv':inv=newInv();renderView();return;
+    case 'readPL':readPL();return;
+    case 'savePL':savePL();return;
+    case 'cancelPL':pl=newPL();renderView();return;
+    case 'delPL':{if(!t.dataset.sure){t.dataset.sure='1';t.textContent='Tap again to delete';return}if(await act('deletePriceList',{id:d.id},'Price list deleted'))closeSheet();return}
+    case 'saleManual':sale=newSale();sale.active=true;sale.f.lines=[{desc:'',qty:1,unit:'Nos',rate:0,amount:0,gst:18,group:'',serial:'',fromStock:false}];renderView();return;
+    case 'rereadSale':readSale();return;
+    case 'addSLine':sale.f.lines.push({desc:'',qty:1,unit:'Nos',rate:0,amount:0,gst:18,group:'',serial:'',fromStock:false});renderView();return;
+    case 'saveSale':saveSale();return;
+    case 'cancelSale':sale=newSale();renderView();return;
+    case 'copyClients':{copyText(['Name\tContact\tPhone\tEmail\tGSTIN\tAddress\tCity\tState\tBills\tTotal bought\tLast bill',...S.clients.map(c=>{const st=clientStats(c.key||c.id);return [c.name,c.contactPerson,c.phone,c.email,c.gstin,c.address,c.city,c.state,st.bills.length,Math.round(st.total),st.last].map(x=>String(x??'').replace(/\t/g,' ')).join('\t')})].join('\n'),'Copied '+S.clients.length+' clients');return}
+    case 'delSale':{if(!t.dataset.sure){t.dataset.sure='1';t.textContent='Tap again to delete';return}if(await act('deleteSale',{id:d.id},'Sales record deleted'))closeSheet();return}
+    case 'delPur':{if(!t.dataset.sure){t.dataset.sure='1';t.textContent='Tap again to delete';return}if(await act('deletePurchase',{id:d.id},'Invoice record deleted'))closeSheet();return}
+  }
+  if(d.rmph!==undefined){snap.photos.splice(+d.rmph,1);if(!snap.photos.length&&!snap.manual)snap=newSnap();renderView();return}
+  if(d.rmip!==undefined){inv.photos.splice(+d.rmip,1);if(!inv.photos.length&&!inv.f.lines.length)inv=newInv();renderView();return}
+  if(d.rmsp!==undefined){sale.photos.splice(+d.rmsp,1);if(!sale.photos.length&&!sale.f.lines.length)sale=newSale();renderView();return}
+  if(d.rmsline!==undefined){sale.f.lines.splice(+d.rmsline,1);renderView();return}
+  if(d.rmspec!==undefined){snap.form.specs.splice(+d.rmspec,1);renderView();return}
+  if(d.rmline!==undefined){inv.f.lines.splice(+d.rmline,1);renderView();return}
+  if(d.a){actionSheet(d.a);return}
+  if(d.back){openItem(d.back);return}
+  if(d.step){const inp=$('#'+d.for);const mx=+inp.dataset.max||999;inp.value=Math.min(mx,Math.max(1,(parseInt(inp.value)||1)+(+d.step)));return}
+  const it=()=>S.items.find(x=>x.id===sheetItem);
+  if(t.id==='doMove'){const i=it();if(!i)return;const to=$('#mvTo').value;if(!to){toast('Choose where it goes');return}const n=readQty('mvQ',q(i));if(await act('move',{id:i.id,to,qty:n,status:$('#mvSt').value,note:$('#mvN').value.trim()},'Moved '+n+' → '+locNm(to)))closeSheet();return}
+  if(t.id==='doSell'){const i=it();if(!i)return;const n=readQty('slQ',q(i));if(await act('sell',{id:i.id,qty:n,note:$('#slN').value.trim()},'Sold '+n+' ✓'))closeSheet();return}
+  if(t.id==='doReserve'){const i=it();if(!i)return;if(await act('reserve',{id:i.id,on:true,name:$('#rsN').value.trim()},'Reserved ✓'))setTimeout(()=>openItem(i.id),300);return}
+  if(t.id==='doEdit'){const i=it();if(!i)return;const specs=$('#eSpecs').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const k=l.indexOf(':');return k>0?{label:l.slice(0,k).trim(),value:l.slice(k+1).trim()}:{label:l,value:''}});
+    const patch={name:$('#eName').value.trim(),group:$('#eGroup').value.trim(),category:$('#eCat').value,status:$('#eSt').value,model:$('#eModel').value.trim(),serial:$('#eSerial').value.trim(),condition:$('#eCond').value,qty:Math.max(0,parseInt($('#eQty').value)||0),specs,notes:$('#eNotes').value.trim()};
+    if(await act('updateItem',{id:i.id,patch},'Saved ✓'))setTimeout(()=>openItem(i.id),300);return}
+  if(t.id==='doDelete'){const i=it();if(!i)return;if(await act('deleteItem',{id:i.id},'Deleted'))closeSheet();return}
+  if(d.myloc){lsSet('tlp_myloc',d.myloc);if(!snap.form.locationId)snap.form.locationId=d.myloc;if(!inv.f.locationId)inv.f.locationId=d.myloc;if(!sale.f.locationId)sale.f.locationId=d.myloc;closeSheet();toast('You’re at '+locNm(d.myloc));render();return}
+  if(t.id==='addLoc'){locSheet(null);return}
+  if(d.editloc){locSheet(d.editloc);return}
+  if(t.id==='saveLoc'){const name=$('#lN').value.trim();if(!name){toast('Name needed');return}if(await act('saveLocation',{loc:{id:d.id,name,kind:$('#lK').value,city:$('#lC').value.trim()}},'Saved ✓')){closeSheet();renderView()}return}
+  if(t.id==='delLoc'){if(await act('deleteLocation',{id:d.id},'Deleted')){closeSheet();renderView()}return}
+  if(t.id==='copyLink'){const p=new URLSearchParams({api:CFG.api,token:CFG.token});const l=$('#linkLoc').value;if(l)p.set('loc',l);copyText(location.origin+location.pathname+'?'+p,'Setup link copied — send it on WhatsApp');return}
+  if(t.id==='saveSettings'){CFG.me=$('#sMe').value.trim();CFG.api=$('#sApi').value.trim();CFG.token=$('#sTok').value.trim();const pin=$('#sPin').value.trim();lsSet('tlp_me',CFG.me);lsSet('tlp_api',CFG.api);lsSet('tlp_token',CFG.token);
+    CFG.pin='';ssSet('tlp_pin','');
+    if(CFG.api&&CFG.token){MODE='sheet';if(pin){try{await SB.get({action:'checkPin',pin});CFG.pin=pin;ssSet('tlp_pin',pin);toast('Admin unlocked')}catch(e){toast('Admin PIN wrong — saved the rest')}}closeSheet();S.loaded=false;renderView();if(!SB._started){SB._started=true;SB.init()}else SB.refresh(true)}else{closeSheet()}return}
+});
+document.addEventListener('input',e=>{
+  const t=e.target,d=t.dataset;
+  if(t.id==='sq'){ui.q=t.value;renderList();return}
+  if(t.id==='bq'){ui.bq=t.value;const pos=t.selectionStart;renderView();const n=$('#bq');if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(x){}}return}
+  if(d.f){const k=d.f;snap.form[k]=t.value;if(k==='group')snap.groupTouched=true;
+    if((k==='type'||k==='size')&&!snap.groupTouched){snap.form.group=[snap.form.type,snap.form.size].filter(Boolean).join(' · ');const g=$('#fGroup');if(g)g.value=snap.form.group}
+    if(['group','model','serial'].includes(k))refreshMatch();return}
+  if(d.si!==undefined){snap.form.specs[+d.si][d.sk]=t.value;return}
+  if(t.id==='qv'){snap.form.qty=Math.max(1,parseInt(t.value)||1);return}
+  if(d.if){inv.f[d.if]=t.value;if(['tax','freight','total'].includes(d.if))invTotals();return}
+  if(d.sc){sale.f.client[d.sc]=t.value;return}
+  if(d.pl&&t.tagName!=='BUTTON'){pl.f[d.pl]=t.value;return}
+  if(d.pli!==undefined){const it=pl.f.items[+d.pli];if(it)it[d.plk]=d.plk==='listPrice'?num(t.value):t.value;return}
+  if(d.sf){sale.f[d.sf]=t.value;if(['tax','freight','total'].includes(d.sf))saleTotals();return}
+  if(d.sli!==undefined){const l=sale.f.lines[+d.sli];if(!l)return;if(d.slk==='fromStock'){l.fromStock=t.checked;return}l[d.slk]=t.value;if(['qty','rate'].includes(d.slk))saleTotals();return}
+  if(d.li!==undefined){const l=inv.f.lines[+d.li];if(!l)return;if(d.lk==='addStock'){l.addStock=t.checked;return}l[d.lk]=t.value;if(['qty','rate'].includes(d.lk))invTotals();return}
+});
+document.addEventListener('change',e=>{
+  const t=e.target,d=t.dataset||{};
+  if(t.id==='sloc'){ui.fLoc=t.value;renderList();return}
+  if(t.id==='logLoc'){ui.logLoc=t.value;renderView();return}
+  if(d.f){snap.form[d.f]=t.value;refreshMatch();return}
+  if(d.if){inv.f[d.if]=t.value;return}
+  if(d.pl==='discount'||d.plk==='group'||d.plk==='listPrice'){const y=window.scrollY;renderView();window.scrollTo(0,y);return}
+  if(d.sc&&['name','gstin','phone'].includes(d.sc)){sale.f.client[d.sc]=t.value;renderView();return}
+  if(d.sf==='locationId'){sale.f.locationId=t.value;renderView();return}
+  if(d.sli!==undefined&&(d.slk==='group'||d.slk==='fromStock'||d.slk==='qty'||d.slk==='rate')){const l=sale.f.lines[+d.sli];if(l){if(d.slk==='fromStock')l.fromStock=t.checked;else l[d.slk]=t.value;if(d.slk!=='fromStock'&&d.slk!=='group')saleTotals();}const y=window.scrollY;renderView();window.scrollTo(0,y);return}
+  if(d.li!==undefined&&d.lk==='addStock'){const l=inv.f.lines[+d.li];if(l){l.addStock=t.checked;const b=$('#saveInv');if(b)b.textContent='Save invoice'+(inv.f.lines.some(x=>x.addStock&&x.group)?' + add to stock':'')}}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='askQ'){e.preventDefault();askStock()}});
+async function onMachineFiles(files){
+  files=[...files].slice(0,3-snap.photos.length);if(!files.length)return;
+  if(ui.view!=='snap'||ui.snapMode!=='machine'){ui.snapMode='machine';ui.view='snap'}
+  snap.active=true;snap.err='';renderView();
+  for(const f of files){try{snap.photos.push(await prepPhoto(f,'m'))}catch(err){snap.err=err.message}}
+  if(!snap.form.locationId)snap.form.locationId=myLoc();
+  renderView();
+  if(snap.photos.length&&canAutoAI())identify();
+}
+async function onInvFiles(files){
+  files=[...files].slice(0,4-inv.photos.length);if(!files.length)return;
+  ui.snapMode='inv';ui.view='snap';inv.active=true;inv.err='';renderView();
+  for(const f of files){try{inv.photos.push(await prepPhoto(f,'inv'))}catch(err){inv.err=err.message}}
+  if(!inv.f.locationId)inv.f.locationId=myLoc();
+  renderView();
+  if(inv.photos.length&&canAutoAI())readInvoice();
+}
+function canAutoAI(){return MODE==='sheet'||(MODE==='claude'&&K.sample&&K.aiImages!==false)}
+for(const id of ['mPick','mCam','mGal'])$('#'+id).addEventListener('change',e=>{const f=e.target.files;if(f&&f.length)onMachineFiles(f);e.target.value=''});
+async function onSaleFiles(files){
+  files=[...files].slice(0,4-sale.photos.length);if(!files.length)return;
+  ui.snapMode='sale';ui.view='snap';sale.active=true;sale.err='';renderView();
+  for(const f of files){try{sale.photos.push(await prepPhoto(f,'inv'))}catch(err){sale.err=err.message}}
+  if(!sale.f.locationId)sale.f.locationId=myLoc();
+  renderView();
+  if(sale.photos.length&&canAutoAI())readSale();
+}
+for(const id of ['plPick','plCam'])$('#'+id).addEventListener('change',e=>{const f=e.target.files;if(f&&f.length){if(!isAdmin()){toast('Price lists are for admins');return}addPLFiles(f)}e.target.value=''});
+for(const id of ['sPick','sCam'])$('#'+id).addEventListener('change',e=>{const f=e.target.files;if(f&&f.length)onSaleFiles(f);e.target.value=''});
+for(const id of ['iPick','iCam'])$('#'+id).addEventListener('change',e=>{const f=e.target.files;if(f&&f.length)onInvFiles(f);e.target.value=''});
+let matchKey='';
+function refreshMatch(){const m=findMatch();const k=m?m.id+':'+q(m)+':'+snap.form.qty:'';if(k===matchKey)return;matchKey=k;const ae=document.activeElement,id=ae&&ae.dataset&&ae.dataset.f,pos=ae&&ae.selectionStart;renderView();if(id){const n=document.querySelector(`[data-f="${id}"]`);if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(x){}}}}
+
+async function saveSnap(){
+  const f=snap.form;f.qty=Math.max(1,parseInt($('#qv')?.value)||1);if(!f.group)f.group=[f.type,f.size].filter(Boolean).join(' · ');
+  if(!f.name&&!f.group){toast('Give the machine a name or group');return}if(!f.locationId){toast('Choose the location');return}
+  const btn=$('#saveSnap');btn.disabled=true;btn.textContent='Saving…';
+  const item={name:f.name||f.group,category:f.category,type:f.type,size:f.size,group:f.group||f.name,brand:f.brand,model:f.model,serial:f.serial,condition:f.condition,specs:f.specs.filter(s=>s.label||s.value),locationId:f.locationId,qty:f.qty,status:f.status,notes:f.notes,reservedFor:''};
+  if(await act('addItem',{item,thumbs:snap.photos.map(p=>p.thumb).slice(0,2)},'Saved ✓ '+item.name+' × '+item.qty)){snap=newSnap();renderView()}else{btn.disabled=false;btn.textContent='Save to stock'}
+}
+async function addToMatch(){const m=findMatch();if(!m)return;const add=Math.max(1,parseInt($('#qv')?.value)||1);if(await act('adjust',{id:m.id,delta:add,thumbs:snap.photos.map(p=>p.thumb).slice(0,2)},'Added '+add+' → now '+(q(m)+add))){snap=newSnap();renderView()}}
+
+
+/* ================= SALES INVOICES & CLIENTS ================= */
+function newSale(){return {photos:[],busy:false,err:'',active:false,aiDone:false,saving:false,f:{invoiceNo:'',date:new Date().toISOString().slice(0,10),seller:'',locationId:myLoc(),client:{name:'',gstin:'',phone:'',email:'',address:'',city:'',state:'',contactPerson:''},lines:[],tax:0,freight:0,total:0,notes:'',confidence:''}}}
+let sale=newSale();
+function salePrompt(groups){return `These photo(s) are the pages of ONE SALES invoice issued by TL Pathak Group (it may be printed under Pathak Industries Kol, Pathak Engineers or another group company) to a customer. Extract exactly what is written — never invent. If something is unreadable leave it empty/0 and mention it in "notes".
+Numbers: plain numbers, no commas, no ₹. Date: YYYY-MM-DD.
+client = the BUYER ("Bill to" / "Buyer" / "Consignee" / "Party"): name, gstin, phone, email, address (one line), city, state, contactPerson.
+seller = our company name printed as the seller.
+For EACH line item: desc (as written), hsn, serial (machine serial / Sl. No. / M/c No. if written, else ""), qty, unit, rate (per unit BEFORE GST), amount (taxable value BEFORE GST), gst (GST %), isMachine (true for machines/equipment from stock; false for spares, services, freight, installation), group: for machines return the matching stock group EXACTLY if one of these is the same kind and size: ${JSON.stringify(groups.slice(0,150))}; otherwise propose "<Machine Type> · <Size>"; "" for non-machines.
+Also: invoiceNo, date, subtotal (taxable value), tax (total GST), freight (freight/packing/other charges before GST, 0 if none), total (grand total), confidence ("high"|"medium"|"low"), notes.
+Reply with ONLY this JSON: {"seller":"","invoiceNo":"","date":"","client":{"name":"","gstin":"","phone":"","email":"","address":"","city":"","state":"","contactPerson":""},"lines":[{"desc":"","hsn":"","serial":"","qty":0,"unit":"","rate":0,"amount":0,"gst":0,"isMachine":true,"group":""}],"subtotal":0,"tax":0,"freight":0,"total":0,"confidence":"","notes":""}`}
+function clientKey(c){
+  const g=String(c.gstin||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(g.length>=15)return 'g-'+g.slice(0,15);
+  const p=String(c.phone||'').replace(/\D/g,'').slice(-10);if(p.length===10)return 'p-'+p;
+  const n=String(c.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60);return n?'n-'+n:'';
+}
+function findClient(c){const k=clientKey(c);if(!k)return null;return S.clients.find(x=>x.id===k||x.key===k)||S.clients.find(x=>c.name&&(x.name||'').toLowerCase()===c.name.toLowerCase().trim())||null}
+function stockAt(group,loc){return S.items.filter(i=>live(i)&&(!loc||i.locationId===loc)&&groupOf(i).toLowerCase()===String(group).toLowerCase()).reduce((a,i)=>a+q(i),0)}
+function pickStock(line,loc){ // which stock records a sold line comes out of
+  let need=Math.round(num(line.qty));const out=[];if(!line.group||need<=0)return {out,short:0};
+  const rank=i=>(line.serial&&i.serial&&i.serial.toLowerCase()===String(line.serial).toLowerCase()?0:1)*10+({'In stock':0,'Reserved':1,'Demo':2,'In transit':3}[i.status||'In stock']??4);
+  const c=S.items.filter(i=>live(i)&&i.locationId===loc&&groupOf(i).toLowerCase()===line.group.toLowerCase()).sort((a,b)=>rank(a)-rank(b));
+  for(const i of c){if(need<=0)break;const t=Math.min(q(i),need);out.push({itemId:i.id,qty:t,name:i.name});need-=t}
+  return {out,short:need};
+}
+async function readSale(){
+  if(!sale.photos.length)return;sale.busy=true;sale.err='';renderView();
+  try{
+    const o=await BE().vision(salePrompt(allGroups()),sale.photos);if(!o||typeof o!=='object')throw new Error('AI reply was unclear — tap “Read again”.');
+    const f=sale.f,c=o.client||{};
+    for(const k of ['name','gstin','phone','email','address','city','state','contactPerson'])if(typeof c[k]==='string')f.client[k]=c[k].slice(0,200);
+    for(const k of ['invoiceNo','seller','notes','confidence'])if(typeof o[k]==='string')f[k]=o[k].slice(0,200);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(o.date||''))f.date=o.date;
+    f.tax=num(o.tax);f.freight=num(o.freight);f.total=num(o.total);
+    f.lines=(Array.isArray(o.lines)?o.lines:[]).slice(0,40).map(l=>{const qty=num(l.qty)||1,rate=num(l.rate),amount=num(l.amount)||+(qty*rate).toFixed(2);return {desc:String(l.desc||'').slice(0,160),hsn:String(l.hsn||''),serial:String(l.serial||'').slice(0,60),qty,unit:String(l.unit||'Nos'),rate:rate||(qty?+(amount/qty).toFixed(2):0),amount,gst:num(l.gst),group:String(l.group||'').slice(0,90),fromStock:!!l.isMachine&&!!l.group}});
+    sale.aiDone=true;
+  }catch(e){sale.err=aiErr(e)}
+  sale.busy=false;renderView();
+}
+function margin(line){if(!isAdmin()||!line.group)return null;const b=buyTable().find(x=>x.group===line.group);if(!b||!b.lastLanded||!num(line.rate))return null;const m=num(line.rate)-b.lastLanded;return {cost:b.lastLanded,m,pct:Math.round(m/num(line.rate)*100)}}
+function saleHTML(){
+  if(!sale.active)return `<div class="card snap-hero">
+      <label class="bigcam" for="sPick" style="background:var(--ok);box-shadow:0 12px 30px rgba(30,138,76,.35),0 0 0 10px var(--ok-l)" aria-label="Photograph sales invoice">${IC.sell.replace('<svg','<svg width="60" height="60"')}</label>
+      <h2>Snap a sales invoice</h2>
+      <p>Photograph the bill you gave the customer. AI reads the <b>client’s name, GSTIN, phone, address</b> and the machines sold. The machines come out of stock, and the client is saved to your client list.</p>
+      <div class="row" style="justify-content:center;flex-wrap:wrap"><label class="btn ghost" for="sCam">Open camera</label><button class="btn ghost" id="saleManual">Type it in</button></div>
+    </div>${aiNote()}`;
+  const f=sale.f,c=f.client;let ai='';
+  if(sale.busy)ai=`<div class="ai-box busy"><div class="spin"></div><div><b>Reading the sales invoice…</b><br>Client details, machines, rates — takes 10–40 s.</div></div>`;
+  else if(sale.err)ai=`<div class="ai-box err"><div>⚠️</div><div>${esc(sale.err)}</div></div>`;
+  else if(sale.aiDone)ai=`<div class="ai-box ${f.confidence==='low'?'lo':'ok'}"><div>${f.confidence==='low'?'🤔':'✅'}</div><div><b>Read ${f.lines.length} line${f.lines.length===1?'':'s'} for ${esc(c.name||'the client')}</b> — check before saving.${f.notes?'<br>'+esc(f.notes):''}</div></div>`;
+  const ex=findClient(c);const exBills=ex?S.sales.filter(s=>s.clientKey===(ex.key||ex.id)).length:0;
+  const sub=f.lines.reduce((a,l)=>a+num(l.amount),0),calc=sub+num(f.tax)+num(f.freight),diff=num(f.total)&&Math.abs(calc-num(f.total))>Math.max(2,num(f.total)*0.005);
+  return `<div class="photos">${sale.photos.map((p,ix)=>`<div class="ph" style="${cssUrl(p.thumb)}"><button data-rmsp="${ix}" aria-label="Remove">×</button></div>`).join('')}${sale.photos.length<4?`<label class="ph add" for="sPick">＋<br>Next page</label>`:''}</div>
+  ${ai}${!sale.busy&&!sale.aiDone&&!sale.err?aiNote():''}
+  ${sale.photos.length&&!sale.busy?`<div class="row" style="margin:-4px 0 12px"><button class="btn soft" id="rereadSale">↻ Read ${sale.aiDone||sale.err?'again':'with AI'}${sale.photos.length>1?' (all pages)':''}</button></div>`:''}
+  <div class="h" style="margin-top:4px">Client</div>
+  ${ex?`<div class="match">✓ Existing client: <b>${esc(ex.name)}</b>${exBills?` · ${exBills} earlier bill${exBills>1?'s':''}`:''}. Their details will be updated.</div>`:(c.name?`<div class="match" style="background:var(--ok-l);color:#155c34">＋ New client — will be added to your client list.</div>`:'')}
+  <div class="card">
+    <label class="fld"><span>Client / company name</span><input class="inp" data-sc="name" value="${esc(c.name)}"></label>
+    <div class="grid2"><label class="fld"><span>Phone</span><input class="inp" inputmode="tel" data-sc="phone" value="${esc(c.phone)}"></label><label class="fld"><span>Contact person</span><input class="inp" data-sc="contactPerson" value="${esc(c.contactPerson)}"></label></div>
+    <label class="fld"><span>GSTIN</span><input class="inp" data-sc="gstin" value="${esc(c.gstin)}" style="text-transform:uppercase"></label>
+    <label class="fld"><span>Email</span><input class="inp" inputmode="email" data-sc="email" value="${esc(c.email)}"></label>
+    <label class="fld"><span>Address</span><input class="inp" data-sc="address" value="${esc(c.address)}"></label>
+    <div class="grid2"><label class="fld"><span>City</span><input class="inp" data-sc="city" value="${esc(c.city)}"></label><label class="fld"><span>State</span><input class="inp" data-sc="state" value="${esc(c.state)}"></label></div>
+  </div>
+  <div class="card">
+    <div class="grid2"><label class="fld"><span>Invoice no.</span><input class="inp" data-sf="invoiceNo" value="${esc(f.invoiceNo)}"></label><label class="fld"><span>Date</span><input class="inp" type="date" data-sf="date" value="${esc(f.date)}"></label></div>
+    <label class="fld"><span>Billed by (our company)</span><input class="inp" data-sf="seller" value="${esc(f.seller)}" placeholder="Pathak Industries Kol / Pathak Engineers…"></label>
+    <label class="fld"><span>Sold from (stock comes out of)</span><select class="sel" data-sf="locationId">${locOptions(f.locationId,'— Choose showroom / warehouse —')}</select></label>
+  </div>
+  <div class="h">Items sold <button id="addSLine">＋ Add line</button></div>
+  ${f.lines.map((l,ix)=>{const av=l.group?stockAt(l.group,f.locationId):0,mg=margin(l);return `<div class="line"><div class="top2"><b>#${ix+1}</b><input class="inp" style="flex:1" data-sli="${ix}" data-slk="desc" value="${esc(l.desc)}" placeholder="Description"><button data-rmsline="${ix}" style="color:var(--ink3);font-size:20px" aria-label="Remove">×</button></div>
+    <div class="g3"><div><small>Qty</small><input class="inp" inputmode="decimal" data-sli="${ix}" data-slk="qty" value="${esc(l.qty)}"></div><div><small>Rate (ex-GST)</small><input class="inp" inputmode="decimal" data-sli="${ix}" data-slk="rate" value="${esc(l.rate)}"></div><div><small>GST %</small><input class="inp" inputmode="decimal" data-sli="${ix}" data-slk="gst" value="${esc(l.gst)}"></div></div>
+    <div class="grid2" style="gap:0 6px"><div><small>Stock group</small><input class="inp" data-sli="${ix}" data-slk="group" value="${esc(l.group)}" list="grpList4" placeholder="blank for spares/services"></div><div><small>Serial no.</small><input class="inp" data-sli="${ix}" data-slk="serial" value="${esc(l.serial)}"></div></div>
+    <div class="row" style="justify-content:space-between;margin-top:6px"><label class="chk"><input type="checkbox" data-sli="${ix}" data-slk="fromStock" ${l.fromStock?'checked':''}> Take out of stock</label><span class="rupee" id="samt${ix}">${inr(l.amount)}</span></div>
+    ${l.group?`<div class="muted" style="font-size:12.5px;margin-top:4px;${l.fromStock&&av<num(l.qty)?'color:var(--red)':''}">${av} in stock at ${esc(shortLoc(f.locationId))}${l.fromStock&&av<num(l.qty)?' — not enough; only '+av+' will be taken out':''}</div>`:''}
+    ${mg?`<div class="lock" style="margin-top:4px">🔒 Cost ${inr(mg.cost)} · margin ${inr(mg.m)} (${mg.pct}%)</div>`:''}</div>`}).join('')||'<div class="empty" style="padding:14px">No lines yet — read with AI or add a line.</div>'}
+  <datalist id="grpList4">${allGroups().map(g=>`<option value="${esc(g)}">`).join('')}</datalist>
+  <div class="card"><div class="tot">
+    <span>Taxable value</span><b class="rupee" id="saleSub">${inr(sub)}</b>
+    <span>GST total</span><input class="inp" inputmode="decimal" data-sf="tax" value="${esc(f.tax)}">
+    <span>Freight / other</span><input class="inp" inputmode="decimal" data-sf="freight" value="${esc(f.freight)}">
+    <span>Invoice total</span><input class="inp" inputmode="decimal" data-sf="total" value="${esc(f.total)}">
+  </div><div id="saleWarn" class="muted" style="margin-top:8px;color:var(--red)">${diff?`⚠️ Lines + GST + freight = ${inr(calc)}, but invoice total says ${inr(f.total)}.`:''}</div>
+  <label class="fld" style="margin-top:10px"><span>Notes</span><input class="inp" data-sf="notes" value="${esc(f.notes)}"></label></div>
+  <button class="btn block" id="saveSale" ${sale.busy||sale.saving?'disabled':''} style="padding:15px;font-size:17px;background:var(--ok)">${sale.saving?'Saving…':'Save sale'+(f.lines.some(l=>l.fromStock&&l.group)?' + take out of stock':'')}</button>
+  <button class="btn ghost block" id="cancelSale" style="margin-top:8px">Cancel</button>`;
+}
+function saleTotals(){const f=sale.f;f.lines.forEach((l,ix)=>{l.amount=+(num(l.qty)*num(l.rate)).toFixed(2);const a=$('#samt'+ix);if(a)a.textContent=inr(l.amount)});const sub=f.lines.reduce((a,l)=>a+num(l.amount),0),calc=sub+num(f.tax)+num(f.freight);const s=$('#saleSub');if(s)s.textContent=inr(sub);const w=$('#saleWarn');if(w)w.textContent=num(f.total)&&Math.abs(calc-num(f.total))>Math.max(2,num(f.total)*0.005)?`⚠️ Lines + GST + freight = ${inr(calc)}, but invoice total says ${inr(f.total)}.`:''}
+async function saveSale(){
+  const f=sale.f,c=f.client;
+  if(!c.name.trim()){toast('Client name needed');return}
+  if(!f.lines.length){toast('Add at least one item');return}
+  if(f.lines.some(l=>l.fromStock&&l.group)&&!f.locationId){toast('Choose which showroom / warehouse it was sold from');return}
+  saleTotals();
+  const client={name:c.name.trim(),gstin:(c.gstin||'').toUpperCase().trim(),phone:(c.phone||'').trim(),email:(c.email||'').trim(),address:(c.address||'').trim(),city:(c.city||'').trim(),state:(c.state||'').trim(),contactPerson:(c.contactPerson||'').trim()};
+  const ex=findClient(client);const key=ex?(ex.key||ex.id):clientKey(client);
+  const lines=f.lines.filter(l=>l.desc||l.group||num(l.amount)).map(l=>({desc:l.desc,hsn:l.hsn||'',serial:(l.serial||'').trim(),qty:num(l.qty),unit:l.unit||'Nos',rate:num(l.rate),amount:num(l.amount),gst:num(l.gst),group:(l.group||'').trim(),fromStock:!!l.fromStock}));
+  const rec={invoiceNo:f.invoiceNo.trim(),date:f.date,seller:f.seller.trim(),locationId:f.locationId,clientKey:key,client,lines,subtotal:lines.reduce((a,l)=>a+l.amount,0),tax:num(f.tax),freight:num(f.freight),total:num(f.total),notes:f.notes||''};
+  if(!rec.total)rec.total=+(rec.subtotal+rec.tax+rec.freight).toFixed(2);
+  const dup=rec.invoiceNo&&S.sales.find(s=>(s.invoiceNo||'').toLowerCase()===rec.invoiceNo.toLowerCase()&&(s.seller||'').toLowerCase()===rec.seller.toLowerCase());
+  if(dup&&!sale.dupOk){sale.dupOk=true;toast('Sales invoice '+rec.invoiceNo+' is already saved. Tap Save again to save anyway.');return}
+  sale.saving=true;renderView();
+  const ok=await act('saveSale',{rec,photos:sale.photos},'Sale saved ✓ '+client.name);
+  sale.saving=false;if(ok){sale=newSale();ui.view='buy';ui.buyMode='sales'}renderView();
+}
+/* claude-mode write */
+async function cbSaveSale(p){
+  const db=K.db,by=meTag(),now=Date.now(),rec=p.rec,images=[];
+  for(const ph of p.photos){if(K.assets){try{const r=await K.assets.upload(ph.blob);images.push(okUrl(r.url)?r.url:('/_blob/'+r.id));continue}catch(e){}}if(images.join('').length<150000)images.push(ph.thumb)}
+  const stockOut=[];
+  for(const l of rec.lines.filter(l=>l.fromStock&&l.group)){
+    const {out}=pickStock(l,rec.locationId);
+    for(const o of out){const i=S.items.find(x=>x.id===o.itemId);if(!i)continue;const left=q(i)-o.qty;
+      await db.doc('items/'+i.id).update({qty:left,...(left<=0?{status:'Sold',soldAt:now}:{}),reservedFor:left<=0?'':(i.reservedFor||''),updatedAt:now,updatedBy:by});
+      i.qty=left;stockOut.push({itemId:i.id,qty:o.qty,line:l.desc});
+      CB.log({action:'sell',itemId:i.id,itemName:i.name,qty:o.qty,from:i.locationId,note:'Inv '+(rec.invoiceNo||'')+' · '+rec.client.name})}
+  }
+  const cref=db.doc('clients/'+rec.clientKey);const cur=await cref.get();
+  const cdata={key:rec.clientKey,...Object.fromEntries(Object.entries(rec.client).filter(([k,v])=>v)),lastSale:rec.date,updatedAt:now};
+  if(cur.exists)await cref.update(cdata);else await cref.set({...rec.client,...cdata,firstSeen:rec.date,createdAt:now});
+  await db.collection('sales').add({...rec,images,stockOut,by,createdAt:now});
+  if(!stockOut.length)CB.log({action:'sale',itemName:rec.client.name+' inv '+(rec.invoiceNo||''),from:rec.locationId});
+}
+/* ---- bills views: sales & clients ---- */
+function salesV(v,head,t){
+  const L=[...S.sales].sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.createdAt||0)-(a.createdAt||0)).filter(s=>!t||[s.client&&s.client.name,s.invoiceNo,s.client&&s.client.gstin,s.client&&s.client.phone,...(s.lines||[]).map(l=>l.desc+' '+l.group+' '+l.serial)].join(' ').toLowerCase().includes(t));
+  const month=new Date().toISOString().slice(0,7),ms=S.sales.filter(s=>String(s.date).startsWith(month));
+  const mt=ms.reduce((a,s)=>a+num(s.subtotal),0);
+  let mm='';if(isAdmin()){let m=0,has=false;ms.forEach(s=>(s.lines||[]).forEach(l=>{const g=margin(l);if(g){m+=g.m*num(l.qty);has=true}}));if(has)mm=`<div class="stat"><div class="v num" style="font-size:20px">${inr(m)}</div><div class="l">Margin this month <span class="lock">ADMIN</span></div></div>`}
+  v.innerHTML=head+`<div class="stats" style="grid-template-columns:1fr 1fr;margin-bottom:12px"><div class="stat hero"><div class="v num" style="font-size:20px">${inr(mt)}</div><div class="l">Sold this month (ex-GST)</div></div>${mm||`<div class="stat"><div class="v num">${ms.length}</div><div class="l">Bills this month</div></div>`}</div>
+  <button class="btn block" data-gosale="1" style="margin-bottom:12px;background:var(--ok)">🧾 Snap a sales invoice</button>`+
+  (L.length?L.map(s=>`<button class="inv" data-sale="${esc(s.id)}"><div class="th" style="${cssUrl((s.images||[])[0])}"></div><div class="tx"><b>${esc(s.client&&s.client.name||'Client')}</b><small>Inv ${esc(s.invoiceNo||'—')} · ${esc(fdate(s.date))} · ${esc(shortLoc(s.locationId))}</small><small>${esc((s.lines||[]).slice(0,2).map(l=>(l.qty>1?l.qty+' × ':'')+l.desc).join(', '))}</small></div><span class="rupee">${inr(s.total)}</span></button>`).join(''):`<div class="empty"><b>No sales recorded yet</b>Snap the invoice you gave a customer.</div>`);
+}
+function clientStats(k){const b=S.sales.filter(s=>s.clientKey===k);return {bills:b,total:b.reduce((a,s)=>a+num(s.total),0),last:b.map(s=>s.date).sort().pop()||''}}
+function clientsV(v,head,t){
+  const C=S.clients.map(c=>({...c,_s:clientStats(c.key||c.id)})).filter(c=>!t||[c.name,c.gstin,c.phone,c.city,c.state,c.contactPerson,c.email].join(' ').toLowerCase().includes(t)).sort((a,b)=>String(b._s.last).localeCompare(String(a._s.last))||(a.name||'').localeCompare(b.name||''));
+  v.innerHTML=head+`<div class="muted" style="margin:0 2px 10px">${S.clients.length} client${S.clients.length===1?'':'s'} · added automatically from sales invoices</div>`+
+  (C.length?C.map(c=>`<button class="inv" data-client="${esc(c.id)}"><div class="th" style="width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--blue-l);color:var(--blue);font:700 18px 'Barlow Condensed'">${esc((c.name||'?').trim().charAt(0).toUpperCase())}</div><div class="tx"><b>${esc(c.name||'Client')}</b><small>${esc([c.city,c.state].filter(Boolean).join(', '))}${c.phone?' · '+esc(c.phone):''}</small><small>${c._s.bills.length} bill${c._s.bills.length===1?'':'s'}${c._s.last?' · last '+esc(fdate(c._s.last)):''}</small></div><span class="rupee">${inr(c._s.total)}</span></button>`).join(''):`<div class="empty"><b>No clients yet</b>They appear here when you save a sales invoice.</div>`)+
+  `<div class="row" style="justify-content:center;margin-top:12px"><button class="btn ghost" id="copyClients">Copy client list for CRM / Excel</button></div>`;
+}
+function waNum(p){const d=String(p||'').replace(/\D/g,'');return d.length===10?'91'+d:d}
+function openSale(id){
+  const s=S.sales.find(x=>x.id===id);if(!s)return;const c=s.client||{};
+  let tm=0,has=false;
+  openSheet(`<div class="sh-t">${esc(c.name||'Client')}</div><div class="sh-s">Sales invoice ${esc(s.invoiceNo||'—')} · ${esc(fdate(s.date))}${s.seller?' · '+esc(s.seller):''}<br>Sold from ${esc(locNm(s.locationId))} · saved by ${esc(who(s.by))} ${esc(ago(s.createdAt))}</div>
+   ${(s.images||[]).length?`<div class="pages">${s.images.filter(okUrl).map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener" style="${cssUrl(u)}" aria-label="Open page"></a>`).join('')}</div>`:''}
+   <div class="card"><dl class="kv" style="margin:0">${c.contactPerson?`<dt>Contact</dt><dd>${esc(c.contactPerson)}</dd>`:''}${c.phone?`<dt>Phone</dt><dd>${esc(c.phone)}</dd>`:''}${c.gstin?`<dt>GSTIN</dt><dd>${esc(c.gstin)}</dd>`:''}${c.email?`<dt>Email</dt><dd>${esc(c.email)}</dd>`:''}${c.address||c.city?`<dt>Address</dt><dd>${esc([c.address,c.city,c.state].filter(Boolean).join(', '))}</dd>`:''}</dl>
+   ${c.phone?`<a class="btn block" style="background:#1FA855;text-decoration:none;margin-top:10px" href="https://wa.me/${esc(waNum(c.phone))}" target="_blank" rel="noopener">${IC.wa.replace('<svg','<svg width="20" height="20"')} WhatsApp client</a>`:''}</div>
+   <div class="card" style="padding:8px 10px;overflow-x:auto"><table class="tbl"><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr>
+   ${(s.lines||[]).map(l=>{const g=margin(l);if(g){tm+=g.m*num(l.qty);has=true}return `<tr><td>${esc(l.desc)}${l.group?`<br><span class="pill">${esc(l.group)}</span>`:''}${l.serial?` <small class="muted">SN ${esc(l.serial)}</small>`:''}${g?`<br><span class="lock">🔒 cost ${inr(g.cost)} · margin ${g.pct}%</span>`:''}</td><td class="n">${esc(l.qty)}</td><td class="n">${inr(l.rate)}</td><td class="n">${inr(l.amount)}</td></tr>`}).join('')}</table></div>
+   <div class="card"><div class="tot"><span>Taxable value</span><b class="rupee">${inr(s.subtotal)}</b><span>GST</span><b class="rupee">${inr(s.tax)}</b><span>Freight / other</span><b class="rupee">${inr(s.freight)}</b><span><b>Total</b></span><b class="big">${inr(s.total)}</b>${has?`<span class="lock">🔒 Margin on this bill</span><b class="rupee" style="color:var(--ok)">${inr(tm)}</b>`:''}</div>${s.notes?`<div class="muted" style="margin-top:8px">${esc(s.notes)}</div>`:''}</div>
+   ${(s.stockOut||[]).length?`<div class="muted" style="margin-bottom:10px">Taken out of stock: ${(s.stockOut||[]).reduce((a,o)=>a+num(o.qty),0)} unit(s).</div>`:''}
+   ${isAdmin()?`<button class="btn ghost block" id="delSale" data-id="${esc(s.id)}" style="color:var(--red)">${IC.del.replace('<svg','<svg width="18" height="18"')} Delete sales record</button><div class="foot">Deleting does not put machines back in stock — use +1 on the item if needed.</div>`:''}`);
+}
+function openClient(id){
+  const c=S.clients.find(x=>x.id===id);if(!c)return;const st=clientStats(c.key||c.id);
+  const machines={};st.bills.forEach(s=>(s.lines||[]).forEach(l=>{if(l.group)machines[l.group]=(machines[l.group]||0)+num(l.qty)}));
+  openSheet(`<div class="sh-t">${esc(c.name)}</div><div class="sh-s">${esc([c.city,c.state].filter(Boolean).join(', '))}${c.firstSeen?' · client since '+esc(fdate(c.firstSeen)):''}</div>
+   <div class="stats" style="grid-template-columns:1fr 1fr;margin-bottom:12px"><div class="stat hero"><div class="v num" style="font-size:20px">${inr(st.total)}</div><div class="l">Total bought</div></div><div class="stat"><div class="v num">${st.bills.length}</div><div class="l">Bills</div></div></div>
+   <div class="card"><dl class="kv" style="margin:0">${c.contactPerson?`<dt>Contact</dt><dd>${esc(c.contactPerson)}</dd>`:''}${c.phone?`<dt>Phone</dt><dd>${esc(c.phone)}</dd>`:''}${c.gstin?`<dt>GSTIN</dt><dd>${esc(c.gstin)}</dd>`:''}${c.email?`<dt>Email</dt><dd>${esc(c.email)}</dd>`:''}${c.address?`<dt>Address</dt><dd>${esc(c.address)}</dd>`:''}</dl>
+   ${c.phone?`<a class="btn block" style="background:#1FA855;text-decoration:none;margin-top:10px" href="https://wa.me/${esc(waNum(c.phone))}" target="_blank" rel="noopener">${IC.wa.replace('<svg','<svg width="20" height="20"')} WhatsApp ${esc(c.contactPerson||c.name)}</a>`:''}</div>
+   ${Object.keys(machines).length?`<div class="h">Machines bought</div><div class="card" style="padding:6px 14px">${Object.entries(machines).map(([g,n])=>`<div class="bar-row" style="grid-template-columns:1fr auto"><div class="nm"><span class="t">${esc(g)}</span></div><div class="num">${n}</div></div>`).join('')}</div>`:''}
+   <div class="h">Bills</div>${st.bills.sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(s=>`<button class="inv" data-sale="${esc(s.id)}"><div class="tx"><b>Inv ${esc(s.invoiceNo||'—')}</b><small>${esc(fdate(s.date))} · ${esc((s.lines||[]).map(l=>l.desc).slice(0,2).join(', '))}</small></div><span class="rupee">${inr(s.total)}</span></button>`).join('')||'<div class="empty">No bills.</div>'}`);
+}
+
+function lastSold(b){const ls=S.sales.flatMap(s=>(s.lines||[]).filter(l=>l.group===b.group).map(l=>({rate:num(l.rate),date:s.date}))).sort((x,y)=>String(y.date).localeCompare(String(x.date)))[0];if(!ls||!ls.rate)return '';const m=ls.rate-b.lastLanded;return `<span>Last sold <b>${inr(ls.rate)}</b> · margin <b style="color:${m>=0?'var(--ok)':'var(--red)'}">${Math.round(m/ls.rate*100)}%</b></span>`}
+
+/* ================= MANUFACTURER PRICE LISTS (admin) ================= */
+const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',PDFW='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',XLSXJS='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const _scr={};function loadScript(u){return _scr[u]||(_scr[u]=new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=()=>{delete _scr[u];rej(new Error('Could not load the file reader — check your internet'))};document.head.appendChild(s)}))}
+function newPL(){return {pages:[],busy:false,progress:'',err:'',active:false,aiDone:false,saving:false,files:[],f:{manufacturer:'',brand:'',validFrom:new Date().toISOString().slice(0,10),currency:'INR',discount:0,terms:'',items:[]}}}
+let pl=newPL();
+function plPrompt(groups,k,n){return `This is part ${k} of ${n} of a MANUFACTURER / SUPPLIER PRICE LIST received by TL Pathak Group (Indian industrial machinery dealer). Extract EVERY item that has a price — never invent prices; skip pure marketing text.
+For each item:
+- model (model/code as printed), desc (short description)
+- category: one of ${JSON.stringify(CATS)}
+- type (precise machine type, e.g. "All-Geared Lathe", "Radial Drill", "Hand Pallet Truck"; for spares/accessories the part type)
+- size (headline trade size: lathe bed length in ft, drill capacity mm, press tonnage, shearing length x thickness, pallet truck/hoist capacity in tons, mixer capacity…)
+- group: "<Type> · <Size>". If one of these existing stock groups is the same kind and size, return it EXACTLY: ${JSON.stringify(groups.slice(0,200))}. For spares/accessories use "<Part type> (spares)".
+- specs: up to 6 key specs as "Label: value; Label: value"
+- listPrice: price per unit as printed (number, no commas/₹). If several variants/prices on one row, make one item per variant.
+- unit (Nos/Set/Kg…), gst (GST % if printed, else 0), priceIncludesGst (true only if the list says prices include GST)
+- notes (optional extras, e.g. "with motor", "without stand")
+Also (if visible in this part): manufacturer (company issuing the list), brand, validFrom (YYYY-MM-DD), currency (INR unless stated), terms (one line: dealer discount, freight, GST, payment, validity).
+Reply with ONLY this JSON: {"manufacturer":"","brand":"","validFrom":"","currency":"","terms":"","items":[{"model":"","desc":"","category":"","type":"","size":"","group":"","specs":"","listPrice":0,"unit":"","gst":0,"priceIncludesGst":false,"notes":""}]}`}
+function plNet(it,disc){const p=num(it.listPrice),g=num(it.gst);const ex=it.priceIncludesGst&&g?p/(1+g/100):p;return Math.round(ex*(1-num(disc)/100))}
+async function addPLFiles(files){
+  pl.active=true;pl.err='';pl.busy=true;ui.view='buy';ui.buyMode='lists';renderView();
+  for(const f of [...files]){
+    const name=(f.name||'').toLowerCase();pl.files.push(f.name||'photo');
+    try{
+      if(f.type==='application/pdf'||name.endsWith('.pdf')){
+        pl.progress='Opening PDF…';renderView();
+        await loadScript(PDFJS);await loadScript(PDFW); // worker script runs on the main thread (pages can't start outside workers)
+        const lib=window.pdfjsLib;lib.GlobalWorkerOptions.workerSrc=PDFW;
+        const doc=await lib.getDocument({data:new Uint8Array(await f.arrayBuffer()),disableWorker:true,isEvalSupported:false}).promise;
+        const n=Math.min(doc.numPages,40);if(doc.numPages>40)pl.err='Only the first 40 pages are read — split bigger PDFs.';
+        for(let i=1;i<=n;i++){
+          pl.progress=`Reading PDF page ${i} of ${n}…`;renderView();
+          const pg=await doc.getPage(i);
+          let txt='';try{const tc=await pg.getTextContent();let lastY=null;for(const it of tc.items){const y=Math.round(it.transform[5]);txt+=(lastY!==null&&Math.abs(y-lastY)>3?'\n':' ')+it.str;lastY=y}}catch(e){}
+          if(txt.replace(/\s/g,'').length>150){pl.pages.push({kind:'text',text:`[Page ${i}]\n`+txt.trim(),label:'p'+i})}
+          else{const vp=pg.getViewport({scale:1});const sc=Math.min(2.5,1700/Math.max(vp.width,vp.height));const v2=pg.getViewport({scale:sc});const c=document.createElement('canvas');c.width=v2.width;c.height=v2.height;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);await pg.render({canvasContext:x,viewport:v2}).promise;
+            pl.pages.push({kind:'img',blob:await toBlob(c,.85),data:c.toDataURL('image/jpeg',.85),thumb:scaled(c,500).toDataURL('image/jpeg',.6),label:'p'+i})}
+        }
+      }else if(/\.(xlsx|xls|csv)$/.test(name)||/sheet|excel|csv/.test(f.type)){
+        pl.progress='Opening spreadsheet…';renderView();
+        await loadScript(XLSXJS);const wb=window.XLSX.read(await f.arrayBuffer(),{type:'array'});
+        for(const sn of wb.SheetNames){const csv=window.XLSX.utils.sheet_to_csv(wb.Sheets[sn],{blankrows:false});if(csv.trim())for(let i=0;i<csv.length;i+=20000)pl.pages.push({kind:'text',text:`[Sheet ${sn}]\n`+csv.slice(i,i+20000),label:sn})}
+      }else{
+        pl.progress='Preparing photo…';renderView();
+        pl.pages.push({kind:'img',...await prepPhoto(f,'inv'),label:'photo'});
+      }
+    }catch(e){pl.err=(e&&e.message)||'Could not open '+f.name}
+  }
+  pl.busy=false;pl.progress='';renderView();
+  if(pl.pages.length&&canAutoAI())readPL();
+}
+function plBatches(){const B=[];let cur=null;for(const p of pl.pages){if(p.kind==='img'){if(!cur||cur.kind!=='img'||cur.items.length>=3){cur={kind:'img',items:[]};B.push(cur)}cur.items.push(p)}else{if(!cur||cur.kind!=='text'||cur.len+p.text.length>22000){cur={kind:'text',items:[],len:0};B.push(cur)}cur.items.push(p);cur.len+=p.text.length}}return B}
+async function readPL(){
+  const B=plBatches();if(!B.length)return;pl.busy=true;pl.err='';const f=pl.f;f.items=[];const groups=allGroups();let fails=0;
+  for(let k=0;k<B.length;k++){
+    pl.progress=`AI reading part ${k+1} of ${B.length}…`;renderView();
+    try{
+      const prompt=plPrompt(groups,k+1,B.length);
+      const o=B[k].kind==='img'?await BE().vision(prompt,B[k].items):await BE().json(prompt+'\n\nPRICE LIST TEXT:\n'+B[k].items.map(p=>p.text).join('\n\n'));
+      if(!o||typeof o!=='object')throw new Error('unclear reply');
+      for(const key of ['manufacturer','brand','terms'])if(!f[key]&&typeof o[key]==='string')f[key]=o[key].slice(0,200);
+      if(/^\d{4}-\d{2}-\d{2}$/.test(o.validFrom||''))f.validFrom=o.validFrom;
+      if(o.currency&&o.currency!=='INR')f.currency=String(o.currency).slice(0,6);
+      if(!f.discount&&o.terms){const m=String(o.terms).match(/(\d{1,2}(?:\.\d+)?)\s*%\s*(?:dealer\s*)?(?:trade\s*)?disc/i);if(m)f.discount=num(m[1])}
+      (Array.isArray(o.items)?o.items:[]).forEach(it=>{if(!num(it.listPrice))return;f.items.push({model:String(it.model||'').slice(0,60),desc:String(it.desc||'').slice(0,160),category:CATS.includes(it.category)?it.category:'Other',type:String(it.type||'').slice(0,60),size:String(it.size||'').slice(0,40),group:String(it.group||[it.type,it.size].filter(Boolean).join(' · ')).slice(0,90),specs:String(it.specs||'').slice(0,240),listPrice:num(it.listPrice),unit:String(it.unit||'Nos').slice(0,10),gst:num(it.gst),priceIncludesGst:!!it.priceIncludesGst,notes:String(it.notes||'').slice(0,120)})});
+      groups.push(...f.items.map(i=>i.group).filter(g=>!groups.includes(g)));
+    }catch(e){fails++;if(e&&['not_granted','sampling_disabled','images_unavailable','rate_limited','session_expired'].includes(e.code)){pl.err=aiErr(e);break}}
+  }
+  // de-duplicate identical rows that span page breaks
+  const seen=new Set();f.items=f.items.filter(i=>{const k=(i.model+'|'+i.desc+'|'+i.listPrice).toLowerCase();if(seen.has(k))return false;seen.add(k);return true});
+  if(fails&&!pl.err)pl.err=`${fails} part${fails>1?'s':''} couldn’t be read — check those pages, or tap “Read again”.`;
+  pl.aiDone=true;pl.busy=false;pl.progress='';renderView();
+}
+function plCaptureHTML(){
+  const f=pl.f;let ai='';
+  if(pl.busy)ai=`<div class="ai-box busy"><div class="spin"></div><div><b>${esc(pl.progress||'Working…')}</b><br>Big price lists take a minute or two — keep this screen open.</div></div>`;
+  else if(pl.err)ai=`<div class="ai-box ${pl.aiDone&&f.items.length?'lo':'err'}"><div>⚠️</div><div>${esc(pl.err)}</div></div>`;
+  if(!pl.busy&&pl.aiDone&&!pl.err)ai=`<div class="ai-box ok"><div>✅</div><div><b>Found ${f.items.length} priced items in ${new Set(f.items.map(i=>i.group)).size} groups</b> — check the groups and prices, then save.</div></div>`;
+  const cats={};f.items.forEach((it,ix)=>{(cats[it.category]=cats[it.category]||{});(cats[it.category][it.group]=cats[it.category][it.group]||[]).push([it,ix])});
+  return `<div class="sh-t" style="margin-top:4px">New price list</div><div class="sh-s">${esc(pl.files.join(', '))} · ${pl.pages.length} page${pl.pages.length===1?'':'s'}</div>
+  ${pl.pages.some(p=>p.kind==='img')?`<div class="photos">${pl.pages.filter(p=>p.kind==='img').slice(0,8).map(p=>`<div class="ph" style="${cssUrl(p.thumb)}"></div>`).join('')}</div>`:''}
+  ${ai}${!pl.busy&&!pl.aiDone?aiNote():''}
+  <div class="row" style="margin:0 0 12px;flex-wrap:wrap"><label class="btn ghost" for="plPick">＋ More pages / files</label>${pl.pages.length&&!pl.busy?`<button class="btn soft" id="readPL">↻ ${pl.aiDone?'Read again':'Read with AI'}</button>`:''}</div>
+  <div class="card">
+    <label class="fld"><span>Manufacturer / supplier</span><input class="inp" data-pl="manufacturer" value="${esc(f.manufacturer)}"></label>
+    <div class="grid2"><label class="fld"><span>Brand</span><input class="inp" data-pl="brand" value="${esc(f.brand)}"></label><label class="fld"><span>Valid from</span><input class="inp" type="date" data-pl="validFrom" value="${esc(f.validFrom)}"></label>
+    <label class="fld"><span>Our dealer discount %</span><input class="inp" inputmode="decimal" data-pl="discount" value="${esc(f.discount)}"></label><label class="fld"><span>Currency</span><input class="inp" data-pl="currency" value="${esc(f.currency)}"></label></div>
+    <label class="fld"><span>Terms (freight, GST, payment)</span><input class="inp" data-pl="terms" value="${esc(f.terms)}"></label>
+  </div>
+  ${Object.keys(cats).sort((a,b)=>CATS.indexOf(a)-CATS.indexOf(b)).map(c=>`<div class="cat-h"><span>${esc(c)}</span><span class="num">${Object.values(cats[c]).flat().length}</span></div>`+Object.entries(cats[c]).sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(([g,arr])=>`<div class="line"><div class="row" style="justify-content:space-between;margin-bottom:6px"><b style="font-size:14.5px">${esc(g)}</b><span class="pill">${arr.length}</span></div>
+    ${arr.map(([it,ix])=>`<div style="border-top:1px solid #EEF0EA;padding:6px 0"><div class="row" style="gap:6px"><input class="inp" style="flex:1;padding:7px 9px;font-size:14px" data-pli="${ix}" data-plk="model" value="${esc(it.model)}" placeholder="Model"><input class="inp" style="width:110px;padding:7px 9px;font-size:14px;text-align:right" inputmode="decimal" data-pli="${ix}" data-plk="listPrice" value="${esc(it.listPrice)}"><button data-rmpli="${ix}" style="color:var(--ink3);font-size:18px" aria-label="Remove">×</button></div>
+      <div class="muted" style="font-size:12.5px;margin-top:3px">${esc(it.desc)}${it.specs?' · '+esc(it.specs):''}${it.priceIncludesGst?' · incl. GST':''} · net <b>${inr(plNet(it,f.discount))}</b></div>
+      <input class="inp" style="margin-top:4px;padding:6px 9px;font-size:13px" data-pli="${ix}" data-plk="group" value="${esc(it.group)}" list="grpList5"></div>`).join('')}</div>`).join('')).join('')}
+  <datalist id="grpList5">${allGroups().map(g=>`<option value="${esc(g)}">`).join('')}</datalist>
+  ${pl.aiDone&&!f.items.length?'<div class="empty">No priced items found yet.</div>':''}
+  <button class="btn block" id="savePL" ${pl.busy||pl.saving||!f.items.length?'disabled':''} style="padding:15px;font-size:17px;background:var(--blue-d);margin-top:8px">${pl.saving?'Saving…':`Save price list (${f.items.length} items)`}</button>
+  <button class="btn ghost block" id="cancelPL" style="margin-top:8px">Cancel</button>`;
+}
+async function savePL(){
+  const f=pl.f;if(!f.manufacturer.trim()){toast('Manufacturer name needed');return}
+  pl.saving=true;renderView();
+  const rec={manufacturer:f.manufacturer.trim(),brand:f.brand.trim(),validFrom:f.validFrom,currency:f.currency||'INR',discount:num(f.discount),terms:f.terms,fileName:pl.files.join(', ').slice(0,200),items:f.items.map(i=>({...i,listPrice:num(i.listPrice)}))};
+  const ok=await act('savePriceList',{rec,photos:pl.pages.filter(p=>p.kind==='img').slice(0,3)},'Price list saved ✓ '+rec.items.length+' items');
+  pl.saving=false;if(ok){pl=newPL();ui.buyMode='lists'}renderView();
+}
+async function cbSavePriceList(p){
+  const db=K.db,by=meTag(),now=Date.now(),rec=p.rec,pages=[];
+  for(const ph of p.photos){if(K.assets){try{const r=await K.assets.upload(ph.blob);pages.push(okUrl(r.url)?r.url:('/_blob/'+r.id))}catch(e){}}}
+  const {items,...meta}=rec;
+  const ref=await db.collection('pricelists').add({...meta,pages,itemCount:items.length,by,createdAt:now});
+  for(let i=0,part=0;i<items.length;i+=120,part++)await db.doc('plitems/'+ref.id+'-'+part).set({listId:ref.id,part,items:items.slice(i,i+120)});
+}
+async function cbDeletePriceList(id){const n=Math.ceil(((S.pricelists.find(x=>x.id===id)||{}).itemCount||0)/120)+1;for(let i=0;i<n;i++)await K.db.doc('plitems/'+id+'-'+i).delete();await K.db.doc('pricelists/'+id).delete()}
+function plBest(group){let best=null;S.pricelists.forEach(l=>(l.items||[]).forEach(it=>{if(it.group!==group)return;const n=plNet(it,l.discount);if(n>0&&(!best||n<best.net))best={net:n,list:num(it.listPrice),mfr:l.manufacturer,model:it.model,date:l.validFrom}}));return best}
+function listsV(v,head,t){
+  if(pl.active){v.innerHTML=plCaptureHTML();return}
+  const all=[];S.pricelists.forEach(l=>(l.items||[]).forEach(it=>all.push({...it,mfr:l.manufacturer,disc:l.discount,date:l.validFrom,lid:l.id})));
+  let body='';
+  if(t){const w=t.split(/\s+/);const R=all.filter(i=>{const h=[i.model,i.desc,i.group,i.mfr,i.specs,i.type,i.size].join(' ').toLowerCase();return w.every(x=>h.includes(x))}).sort((a,b)=>a.group.localeCompare(b.group)||plNet(a,a.disc)-plNet(b,b.disc)).slice(0,200);
+    body=R.length?`<div class="muted" style="margin:0 2px 8px">${R.length} match${R.length===1?'':'es'} · cheapest first in each group</div>`+R.map(i=>`<div class="bp"><div class="r1"><b>${esc(i.model||i.desc)}</b><span class="rupee" style="color:var(--blue-d)">${inr(plNet(i,i.disc))}</span></div><div class="r2"><span>${esc(i.mfr)}</span><span class="pill">${esc(i.group)}</span><span>List <b>${inr(i.listPrice)}</b>${i.disc?' − '+esc(i.disc)+'%':''}</span>${i.specs?`<span>${esc(i.specs)}</span>`:''}</div></div>`).join(''):'<div class="empty">No price-list items match.</div>';
+  }else{
+    body=[...S.pricelists].sort((a,b)=>String(b.validFrom).localeCompare(String(a.validFrom))).map(l=>`<button class="inv" data-pl="${esc(l.id)}"><div class="th" style="${cssUrl((l.pages||[])[0])}"></div><div class="tx"><b>${esc(l.manufacturer)}</b><small>${esc(l.brand?l.brand+' · ':'')}valid from ${esc(fdate(l.validFrom))}${l.discount?' · '+esc(l.discount)+'% discount':''}</small><small>${(l.items||[]).length||l.itemCount||0} items · ${new Set((l.items||[]).map(i=>i.category)).size} categories</small></div></button>`).join('')||`<div class="empty"><b>No price lists yet</b>Add a manufacturer’s price list — photos, PDF or Excel.</div>`;
+  }
+  v.innerHTML=head+`<label class="btn block" for="plPick" style="margin-bottom:8px;background:var(--blue-d)">📄 Add price list (photos / PDF / Excel)</label><label class="btn ghost block" for="plCam" style="margin-bottom:12px">📷 Photograph pages</label>`+body;
+}
+function openPL(id){
+  const l=S.pricelists.find(x=>x.id===id);if(!l)return;const cats={};(l.items||[]).forEach(it=>{(cats[it.category]=cats[it.category]||{});(cats[it.category][it.group]=cats[it.category][it.group]||[]).push(it)});
+  openSheet(`<div class="sh-t">${esc(l.manufacturer)}</div><div class="sh-s">${esc(l.brand?l.brand+' · ':'')}valid from ${esc(fdate(l.validFrom))}${l.discount?' · our discount '+esc(l.discount)+'%':''}${l.terms?'<br>'+esc(l.terms):''}<br>${esc(l.fileName||'')} · saved by ${esc(who(l.by))} ${esc(ago(l.createdAt))}</div>
+  ${(l.pages||[]).length?`<div class="pages">${l.pages.filter(okUrl).map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener" style="${cssUrl(u)}"></a>`).join('')}</div>`:''}
+  ${Object.keys(cats).sort((a,b)=>CATS.indexOf(a)-CATS.indexOf(b)).map(c=>`<div class="cat-h"><span>${esc(c)}</span></div>`+Object.entries(cats[c]).map(([g,arr])=>`<div class="card" style="padding:8px 10px"><b style="font-size:14.5px">${esc(g)}</b><table class="tbl" style="margin-top:4px"><tr><th>Model</th><th style="text-align:right">List</th><th style="text-align:right">Net</th></tr>${arr.map(it=>`<tr><td>${esc(it.model||it.desc)}${it.specs?`<br><small class="muted">${esc(it.specs)}</small>`:''}</td><td class="n">${inr(it.listPrice)}</td><td class="n">${inr(plNet(it,l.discount))}</td></tr>`).join('')}</table></div>`).join('')).join('')}
+  <button class="btn ghost block" id="delPL" data-id="${esc(l.id)}" style="color:var(--red)">${IC.del.replace('<svg','<svg width="18" height="18"')} Delete price list</button>`);
+}
+
+/* ================= boot ================= */
+let namesBusy=false;
+async function resolveNames(){if(!K.user||!K.user.profiles||namesBusy)return;const ids=[...new Set([...S.items.flatMap(i=>[i.addedBy,i.updatedBy]),...S.log.map(l=>l.by),...S.purchases.map(p=>p.by),...S.sales.map(p=>p.by)].filter(x=>x&&typeof x==='string'&&!(x in names)))];if(!ids.length)return;namesBusy=true;try{const ps=await K.user.profiles(ids);ids.forEach(id=>{names[id]=(ps&&ps[id]&&ps[id].name)||'Someone'});render()}catch(e){}namesBusy=false}
+const h0=location.hash.slice(1);if(VIEWS.includes(h0))ui.view=h0;if(window._startQ)ui.view='stock';
+renderView();
+(async()=>{
+  if(CFG.api&&CFG.token){MODE='sheet';SB._started=true;renderView();await SB.init();return}
+  if(typeof window.claude==='undefined'||!window.claude||!window.claude.use){
+    // On GitHub Pages: read the server URL from config.json so staff only need the team key
+    if(!CFG.api){try{const r=await fetch('config.json',{cache:'no-store'});const c=await r.json();if(c&&c.apiUrl){CFG.api=c.apiUrl;lsSet('tlp_api',CFG.api)}}catch(e){}}
+    MODE='none';setLive('setup');renderView();return}
+  const db=await window.claude.use('db');
+  if(!db){MODE='none';setLive('setup');banner('Open this page signed in to Claude to see live stock.');renderView();return}
+  MODE='claude';K.db=db;
+  K.user=await window.claude.use('user');
+  if(K.user){try{K.meId=await K.user.id()||''}catch(e){}try{K.canEdit=!!(await K.user.canEdit())}catch(e){}try{const c=await K.user.can('data.write');if(c===false){K.canWrite=false;banner('You can view stock. To snap or move machines, ask Hitesh for Contributor access.')}}catch(e){}}
+  K.sample=await window.claude.use('sample');
+  if(K.sample){try{const l=await K.sample.limits();K.aiImages=!!(l&&l.images)}catch(e){K.aiImages=false}}
+  if(K.canEdit)K.assets=await window.claude.use('assets');
+  renderView();
+  await CB.init();
+})();
+</script>
+</body>
+
+</html>
