@@ -283,9 +283,9 @@ function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function ssGet(k){try{return sessionStorage.getItem(k)}catch(e){return null}}
 function ssSet(k,v){try{v?sessionStorage.setItem(k,v):sessionStorage.removeItem(k)}catch(e){}}
-const CFG={api:lsGet('tlp_api')||'',token:lsGet('tlp_token')||'',me:lsGet('tlp_me')||'',pin:ssGet('tlp_pin')||''};
+const CFG={api:lsGet('tlp_api')||'',session:lsGet('tlp_sess')||'',user:null};try{CFG.user=JSON.parse(lsGet('tlp_user')||'null')}catch(e){}
 (function(){try{const u=new URL(location.href);let ch=false;
-  for(const [k,s] of [['api','tlp_api'],['token','tlp_token'],['loc','tlp_myloc']]){const v=u.searchParams.get(k);if(v){lsSet(s,v);if(k==='api')CFG.api=v;if(k==='token')CFG.token=v;u.searchParams.delete(k);ch=true}}
+  for(const [k,s] of [['api','tlp_api'],['loc','tlp_myloc']]){const v=u.searchParams.get(k);if(v){lsSet(s,v);if(k==='api')CFG.api=v;u.searchParams.delete(k);ch=true}}
   if(u.searchParams.get('q'))window._startQ=u.searchParams.get('q');
   if(ch)history.replaceState(null,'',u.pathname+u.search+u.hash);
 }catch(e){}})();
@@ -300,8 +300,8 @@ const ui={view:'home',q:window._startQ||'',fLoc:'all',fCat:'all',showSold:false,
 let snap=newSnap(),inv=newInv();
 function newSnap(){return {photos:[],busy:false,err:'',active:false,manual:false,aiDone:false,groupTouched:false,form:{name:'',category:'Machine Tools',type:'',size:'',group:'',brand:'',model:'',serial:'',condition:'New',specs:[],locationId:myLoc(),qty:1,status:'In stock',notes:'',confidence:'',tip:''}}}
 function newInv(){return {photos:[],busy:false,err:'',active:false,aiDone:false,saving:false,f:{supplier:'',gstin:'',invoiceNo:'',date:new Date().toISOString().slice(0,10),locationId:myLoc(),lines:[],tax:0,freight:0,total:0,notes:'',confidence:''}}}
-const isAdmin=()=>MODE==='claude'?K.canEdit:MODE==='sheet'?!!CFG.pin:false;
-const meTag=()=>MODE==='claude'?(K.meId||''):(CFG.me||'Someone');
+const isAdmin=()=>MODE==='claude'?K.canEdit:MODE==='sheet'?!!(CFG.user&&CFG.user.role==='admin'):false;
+const meTag=()=>MODE==='claude'?(K.meId||''):((CFG.user&&CFG.user.name)||'Someone');
 
 /* ================= helpers ================= */
 const $=s=>document.querySelector(s);
@@ -433,10 +433,10 @@ const CB={
 
 /* ================= BACKEND: your Google Sheet (Apps Script) ================= */
 const SB={
-  async get(params){const u=CFG.api+(CFG.api.includes('?')?'&':'?')+new URLSearchParams({token:CFG.token,pin:CFG.pin,...params});const r=await fetch(u,{redirect:'follow'});const j=await r.json();if(!j.ok)throw new Error(j.error||'Request failed');return j},
-  async post(body){const r=await fetch(CFG.api,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,token:CFG.token,by:CFG.me||'Someone',pin:CFG.pin})});const j=await r.json();if(!j.ok)throw new Error(j.error||'Request failed');if(j.data)applyState(j.data);return j},
+  async get(params){const u=CFG.api+(CFG.api.includes('?')?'&':'?')+new URLSearchParams({session:CFG.session,...params});const r=await fetch(u,{redirect:'follow'});const j=await r.json();if(!j.ok){authErr(j.error);throw new Error(j.error||'Request failed')}return j},
+  async post(body){const r=await fetch(CFG.api,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,session:CFG.session})});const j=await r.json();if(!j.ok){authErr(j.error);throw new Error(j.error==='SIGNED_OUT'?'Please sign in again':j.error||'Request failed')}if(j.data)applyState(j.data);return j},
   async init(){await this.refresh(true);setInterval(()=>{if(document.visibilityState==='visible'&&!busyWrite)this.refresh(false)},8000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')this.refresh(false)})},
-  async refresh(full){try{if(!full&&S.loaded){const v=await this.get({action:'ver'});if(v.ver===S.ver){setLive('on');return}}const j=await this.get({action:'all'});applyState(j.data);banner('')}catch(e){setLive('off');if(!S.loaded){S.loaded=true;banner('Can’t reach the stock server: '+esc(e.message)+'. Check ⚙ Settings.');render()}}},
+  async refresh(full){if(MODE!=='sheet')return;try{if(!full&&S.loaded){const v=await this.get({action:'ver'});if(v.ver===S.ver){setLive('on');return}}const j=await this.get({action:'all'});applyState(j.data);banner('')}catch(e){setLive('off');if(!S.loaded){S.loaded=true;banner('Can’t reach the stock server: '+esc(e.message)+'. Check ⚙ Settings.');render()}}},
   async op(a,p){
     const b={action:a};
     if(a==='addItem'){b.item=p.item;b.photos=p.thumbs}
@@ -456,7 +456,7 @@ let busyWrite=false;
 async function act(a,p,okMsg){
   if(MODE==='none'){openSettings();return false}
   if(MODE==='claude'&&!K.canWrite){toast('View-only: ask Hitesh for Contributor access.');return false}
-  if(MODE==='sheet'&&!CFG.me){toast('Enter your name in ⚙ Settings first');openSettings();return false}
+  if(MODE==='sheet'&&CFG.user&&CFG.user.role==='viewer'){toast('Your account is view-only.');return false}
   if(busyWrite){toast('Saving… one moment');return false}
   busyWrite=true;
   try{await BE().op(a,p);if(okMsg)toast(okMsg);return true}
@@ -530,6 +530,7 @@ function buyFor(group){return isAdmin()?buyTable().find(b=>b.group===group):null
 
 /* ================= render ================= */
 function tabsHTML(){
+  if(MODE==='login'||MODE==='changepw'||MODE==='none'){$('#tabs').innerHTML='';$('#tabs').style.display='none';return}$('#tabs').style.display='';
   const t=[['home','Home',IC.home],['stock','Stock',IC.stock],['snap','Snap',IC.cam],['buy','Bills',IC.buy],['log','Moves',IC.log],['places','Places',IC.pin]];
   $('#tabs').className='tabs'+(t.length===6?' six':'');
   $('#tabs').innerHTML=t.map(([v,l,i])=>v==='snap'?`<button class="tab snapbtn ${ui.view===v?'act':''}" data-v="snap"><span class="ring">${i}</span>${l}</button>`:`<button class="tab ${ui.view===v?'act':''}" data-v="${v}">${i}${l}</button>`).join('');
@@ -546,7 +547,9 @@ function render(){
 function renderView(){
   tabsHTML();
   const v=$('#view');
-  if(MODE==='none'){v.innerHTML=`<div class="card snap-hero"><h2>Connect your stock</h2><p>Open the setup link Hitesh sent you, or tap below and paste the stock server URL and team key.</p><button class="btn block" id="openSettings">Open settings</button></div>`;return}
+  if(MODE==='none'){v.innerHTML=`<div class="card snap-hero"><h2>Connect your stock</h2><p>Open the link Hitesh sent you, or tap below and paste the stock server link.</p><button class="btn block" id="openSettings">Enter server link</button></div>`;return}
+  if(MODE==='login'){v.innerHTML=loginHTML();return}
+  if(MODE==='changepw'){v.innerHTML=changePwHTML();return}
   if(!S.loaded&&MODE){v.innerHTML=loadingHTML();return}
   if(!MODE){v.innerHTML=loadingHTML();return}
   ({home:homeV,stock:stockV,snap:snapV,buy:buyV,log:logV,places:placesV}[ui.view]||homeV)(v);
@@ -764,7 +767,7 @@ function placesV(v){
   v.innerHTML=`<div class="h">Showrooms &amp; warehouses ${isAdmin()?'<button id="addLoc">＋ Add</button>':''}</div>
   ${sortedLocs().map(l=>{const its=L.filter(i=>i.locationId===l.id);const n=its.reduce((a,i)=>a+q(i),0);const g=new Set(its.map(groupOf)).size;
     return `<div class="card" style="display:flex;align-items:center;gap:12px"><button style="flex:1;text-align:left" data-loc="${esc(l.id)}"><div style="display:flex;gap:8px;align-items:center"><b style="font-size:17px">${esc(l.name)}</b><span class="tag ${l.kind==='warehouse'?'wh':''}">${l.kind==='warehouse'?'Warehouse':'Showroom'}</span></div><div class="muted">${esc(l.city||'')}${l.city?' · ':''}${g} groups${l.id===myLoc()?' · <b style="color:var(--red)">You are here</b>':''}</div></button><div class="num" style="font-size:24px;color:var(--blue)">${n}</div>${isAdmin()?`<button class="btn ghost" style="padding:8px 10px" data-editloc="${esc(l.id)}">${IC.edit.replace('<svg','<svg width="18" height="18"')}</button>`:''}</div>`}).join('')||`<div class="empty"><b>No locations yet</b></div>`}
-  ${isAdmin()&&MODE==='sheet'?`<div class="card"><div class="h" style="margin-top:0">Staff setup link</div><div class="muted" style="margin-bottom:8px">Send to a branch — connects their phone and sets their location in one tap.</div><select class="sel" id="linkLoc">${locOptions('','Any location')}</select><button class="btn soft block" id="copyLink" style="margin-top:8px">Copy setup link</button></div>`:''}
+  ${isAdmin()&&MODE==='sheet'?`<div class="card"><div class="h" style="margin-top:0">Staff setup link</div><div class="muted" style="margin-bottom:8px">Send to a branch — opens the app with their location set. They sign in with the email &amp; password you create in ⚙ → Users.</div><select class="sel" id="linkLoc">${locOptions('','Any location')}</select><button class="btn soft block" id="copyLink" style="margin-top:8px">Copy setup link</button></div>`:''}
   ${!isAdmin()?'<div class="foot">Only admins can add or rename locations.</div>':''}`;
 }
 
@@ -817,12 +820,12 @@ function openSettings(){
   if(MODE==='claude'){openSheet(`<div class="sh-t">About this app</div><div class="sh-s">Running inside Claude — stock is shared live with everyone you share this page with.</div>
     <div class="card"><dl class="kv" style="margin:0"><dt>Your access</dt><dd>${K.canEdit?'Admin (sees buy prices)':K.canWrite?'Staff (can change stock)':'View only'}</dd><dt>AI photo reading</dt><dd>${K.sample===null?'Not available here':K.aiImages===false?'Not in this app view':'Ready'}</dd></dl></div>
     <div class="muted">Admins = people you share with as <b>Editor</b>. Staff = <b>Contributor</b>. Purchase invoices and buy prices are visible to admins only.</div>`);return}
-  openSheet(`<div class="sh-t">Settings</div><div class="sh-s">Saved on this phone only.</div>
-  <label class="fld"><span>Your name (shown in the movement log)</span><input class="inp" id="sMe" value="${esc(CFG.me)}" placeholder="e.g. Ravi – Bengaluru"></label>
-  <label class="fld"><span>Stock server (Apps Script /exec URL)</span><input class="inp" id="sApi" value="${esc(CFG.api)}" placeholder="https://script.google.com/macros/s/…/exec"></label>
-  <label class="fld"><span>Team key</span><input class="inp" id="sTok" value="${esc(CFG.token)}"></label>
-  <label class="fld"><span>Admin PIN (buy prices, invoices, locations)</span><input class="inp" id="sPin" type="password" inputmode="numeric" value="${esc(CFG.pin)}"></label>
-  <button class="btn block" id="saveSettings">Save &amp; connect</button>`);
+  if(MODE!=='sheet'){openSheet(`<div class="sh-t">Stock server</div><div class="sh-s">Paste the Apps Script /exec link (Hitesh has it).</div><label class="fld"><span>Server link</span><input class="inp" id="sApi" value="${esc(CFG.api)}" placeholder="https://script.google.com/macros/s/…/exec"></label><button class="btn block" id="saveApi">Save</button>`);return}
+  const u=CFG.user||{};
+  openSheet(`<div class="sh-t">${esc(u.name||'Account')}</div><div class="sh-s">${esc(u.email||'')} · ${esc({admin:'Admin',staff:'Staff',viewer:'View only'}[u.role]||'')}</div>
+  ${isAdmin()?`<button class="btn block" id="openUsers" style="margin-bottom:8px">👥 Users &amp; passwords</button>`:''}
+  <button class="btn soft block" id="openChangePw" style="margin-bottom:8px">Change my password</button>
+  <button class="btn ghost block" id="signOut" style="color:var(--red)">Sign out</button>`);
 }
 
 /* ================= events ================= */
@@ -900,10 +903,17 @@ document.addEventListener('click',async e=>{
   if(d.editloc){locSheet(d.editloc);return}
   if(t.id==='saveLoc'){const name=$('#lN').value.trim();if(!name){toast('Name needed');return}if(await act('saveLocation',{loc:{id:d.id,name,kind:$('#lK').value,city:$('#lC').value.trim()}},'Saved ✓')){closeSheet();renderView()}return}
   if(t.id==='delLoc'){if(await act('deleteLocation',{id:d.id},'Deleted')){closeSheet();renderView()}return}
-  if(t.id==='copyLink'){const p=new URLSearchParams({api:CFG.api,token:CFG.token});const l=$('#linkLoc').value;if(l)p.set('loc',l);copyText(location.origin+location.pathname+'?'+p,'Setup link copied — send it on WhatsApp');return}
-  if(t.id==='saveSettings'){CFG.me=$('#sMe').value.trim();CFG.api=$('#sApi').value.trim();CFG.token=$('#sTok').value.trim();const pin=$('#sPin').value.trim();lsSet('tlp_me',CFG.me);lsSet('tlp_api',CFG.api);lsSet('tlp_token',CFG.token);
-    CFG.pin='';ssSet('tlp_pin','');
-    if(CFG.api&&CFG.token){MODE='sheet';if(pin){try{await SB.get({action:'checkPin',pin});CFG.pin=pin;ssSet('tlp_pin',pin);toast('Admin unlocked')}catch(e){toast('Admin PIN wrong — saved the rest')}}closeSheet();S.loaded=false;renderView();if(!SB._started){SB._started=true;SB.init()}else SB.refresh(true)}else{closeSheet()}return}
+  if(t.id==='copyLink'){const p=new URLSearchParams({api:CFG.api});const l=$('#linkLoc').value;if(l)p.set('loc',l);copyText(location.origin+location.pathname+'?'+p,'Setup link copied — send it on WhatsApp');return}
+  if(t.id==='saveApi'){CFG.api=$('#sApi').value.trim();lsSet('tlp_api',CFG.api);closeSheet();MODE=CFG.api?'login':'none';renderView();return}
+  if(t.id==='openChangePw'){closeSheet();MODE='changepw';renderView();return}
+  if(t.id==='signOut'){try{SB.post({action:'logout'}).catch(()=>{})}catch(e){}signOut();return}
+  if(t.id==='openUsers'){openUsers();return}
+  if(t.id==='saveUser'){saveUser();return}
+  if(d.resetpw){if(!t.dataset.sure){t.dataset.sure='1';t.textContent='Tap again to reset';return}try{const j=await SB.get({action:'resetPassword',email:d.resetpw});showTemp(d.resetpw,j.tempPassword,j.users)}catch(e){toast(e.message)}return}
+  if(d.edituser){userForm(USERS.find(x=>x.email===d.edituser));return}
+  if(t.id==='newUser'){userForm(null);return}
+  if(t.id==='backUsers'){openUsers();return}
+  if(t.id==='copyTemp'){copyText(t.dataset.msg,'Copied — send it on WhatsApp');return}
 });
 document.addEventListener('input',e=>{
   const t=e.target,d=t.dataset;
@@ -1279,17 +1289,87 @@ function openPL(id){
   <button class="btn ghost block" id="delPL" data-id="${esc(l.id)}" style="color:var(--red)">${IC.del.replace('<svg','<svg width="18" height="18"')} Delete price list</button>`);
 }
 
+/* ================= sign-in & users (Google Sheet version) ================= */
+let USERS=[];
+function authErr(e){if(e==='SIGNED_OUT'){signOut(true)}else if(e==='CHANGE_PASSWORD'){MODE='changepw';renderView()}}
+function signOut(expired){if(expired&&MODE==='login')return;CFG.session='';CFG.user=null;lsSet('tlp_sess','');lsSet('tlp_user','');S.loaded=false;MODE=CFG.api?'login':'none';closeSheet();setLive('setup');renderView();if(expired)toast('Please sign in again')}
+function startSheet(){MODE='sheet';S.loaded=false;renderView();if(!SB._started){SB._started=true;SB.init()}else SB.refresh(true)}
+function loginHTML(){return `<div class="card snap-hero" style="text-align:left"><div style="text-align:center"><div class="logo" style="width:64px;height:64px;font-size:30px;margin:4px auto 10px">TL</div><h2>Sign in</h2><p>TL Pathak Stock Live</p></div>
+  <form id="loginForm" onsubmit="event.preventDefault();doLogin()"><label class="fld"><span>Email</span><input class="inp" id="lEmail" type="email" autocomplete="username" value="${esc(lsGet('tlp_lastemail')||'')}" autocapitalize="off"></label>
+  <label class="fld"><span>Password</span><input class="inp" id="lPw" type="password" autocomplete="current-password"></label>
+  <div id="lErr" class="muted" style="color:var(--red);min-height:20px"></div>
+  <button class="btn red block" id="btnLogin" type="submit" style="padding:14px">Sign in</button></form>
+  <div class="foot">Forgot your password? Ask Hitesh to reset it.<br><a href="#" onclick="event.preventDefault();openSettings()" style="color:var(--ink3)">Server link</a></div></div>`}
+function changePwHTML(){const first=CFG.user&&CFG.user.mustChange;return `<div class="card snap-hero" style="text-align:left"><h2 style="text-align:center">${first?'Choose your password':'Change password'}</h2><p style="text-align:center">${first?'You signed in with a temporary password. Pick your own — at least 8 characters.':'At least 8 characters.'}</p>
+  <form onsubmit="event.preventDefault();doChangePw()"><label class="fld"><span>${first?'Temporary password':'Current password'}</span><input class="inp" id="cOld" type="password" autocomplete="current-password"></label>
+  <label class="fld"><span>New password</span><input class="inp" id="cNew" type="password" autocomplete="new-password"></label>
+  <label class="fld"><span>New password again</span><input class="inp" id="cNew2" type="password" autocomplete="new-password"></label>
+  <div id="cErr" class="muted" style="color:var(--red);min-height:20px"></div><button class="btn block" id="btnChangePw" type="submit" style="padding:14px">Save password</button></form>
+  ${first?'':'<button class="btn ghost block" style="margin-top:8px" onclick="startSheet()">Cancel</button>'}</div>`}
+async function doLogin(){
+  const email=($('#lEmail').value||'').trim(),pw=$('#lPw').value||'',err=$('#lErr'),btn=$('#btnLogin');if(!email||!pw){err.textContent='Enter email and password';return}
+  btn.disabled=true;btn.textContent='Signing in…';err.textContent='';
+  try{const r=await fetch(CFG.api,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'login',email,password:pw})});const j=await r.json();
+    if(!j.ok)throw new Error(j.error||'Sign-in failed');
+    CFG.session=j.session;CFG.user=j.user;lsSet('tlp_sess',j.session);lsSet('tlp_user',JSON.stringify(j.user));lsSet('tlp_lastemail',email);
+    if(j.user.mustChange){MODE='changepw';renderView();return}
+    if(!myLoc()&&j.user.location)lsSet('tlp_myloc',j.user.location);
+    toast('Welcome, '+(j.user.name||email));startSheet();
+  }catch(e){err.textContent=e.message==='Failed to fetch'?'Can’t reach the server — check internet or the server link':e.message;btn.disabled=false;btn.textContent='Sign in'}
+}
+async function doChangePw(){
+  const o=$('#cOld').value,n=$('#cNew').value,n2=$('#cNew2').value,err=$('#cErr');
+  if(n.length<8){err.textContent='Use at least 8 characters';return}if(n!==n2){err.textContent='The two new passwords don’t match';return}
+  try{const r=await fetch(CFG.api,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'changePassword',session:CFG.session,old:o,password:n})});const j=await r.json();
+    if(!j.ok){if(j.error==='SIGNED_OUT'){signOut(true);return}throw new Error(j.error)}
+    CFG.user=j.user;lsSet('tlp_user',JSON.stringify(j.user));toast('Password saved ✓');startSheet();
+  }catch(e){err.textContent=e.message}
+}
+async function openUsers(){
+  openSheet('<div class="sh-t">Users</div><div class="empty"><div class="spin" style="margin:0 auto;color:var(--blue)"></div></div>');
+  try{const j=await SB.get({action:'users'});USERS=j.users||[];renderUsers()}catch(e){openSheet(`<div class="sh-t">Users</div><div class="ai-box err">${esc(e.message)}</div>`)}
+}
+function renderUsers(){
+  const R={admin:'Admin',staff:'Staff',viewer:'View only'};
+  openSheet(`<div class="sh-t">Users &amp; passwords</div><div class="sh-s">Admins see buy prices, purchase bills &amp; price lists. Staff snap, move and sell. View-only can just look.</div>
+  <button class="btn block" id="newUser" style="margin-bottom:12px">＋ Add a user</button>
+  ${USERS.map(u=>`<div class="inv" style="cursor:default"><div class="tx"><b>${esc(u.name)}${u.active?'':' <span class="badge Sold">disabled</span>'}</b><small>${esc(u.email)} · ${R[u.role]||u.role}${u.location?' · '+esc(shortLoc(u.location)):''}</small><small>${u.mustChange?'Has not set a password yet':u.lastLogin?'Last sign-in '+esc(ago(u.lastLogin)):'Never signed in'}</small></div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn ghost" style="padding:6px 10px;font-size:13px" data-edituser="${esc(u.email)}">Edit</button><button class="btn ghost" style="padding:6px 10px;font-size:13px" data-resetpw="${esc(u.email)}">Reset password</button></div></div>`).join('')}`);
+}
+function userForm(u){
+  const n=!u;u=u||{role:'staff',active:true,location:myLoc()};
+  openSheet(`<div class="sh-t">${n?'Add a user':'Edit '+esc(u.name)}</div><div class="sh-s">${n?'A temporary password is created — you send it to them; they choose their own at first sign-in.':esc(u.email)}</div>
+  ${n?`<label class="fld"><span>Email</span><input class="inp" id="uEmail" type="email" autocapitalize="off"></label>`:`<input type="hidden" id="uEmail" value="${esc(u.email)}">`}
+  <label class="fld"><span>Name</span><input class="inp" id="uName" value="${esc(u.name||'')}" placeholder="e.g. Ravi Kumar"></label>
+  <div class="grid2"><label class="fld"><span>Role</span><select class="sel" id="uRole"><option value="staff" ${u.role==='staff'?'selected':''}>Staff</option><option value="admin" ${u.role==='admin'?'selected':''}>Admin</option><option value="viewer" ${u.role==='viewer'?'selected':''}>View only</option></select></label>
+  <label class="fld"><span>Branch</span><select class="sel" id="uLoc">${locOptions(u.location||'','Any')}</select></label></div>
+  ${n?'':`<label class="chk" style="margin-bottom:12px"><input type="checkbox" id="uActive" ${u.active?'checked':''}> Account active (untick to block sign-in)</label>`}
+  <button class="btn block" id="saveUser">${n?'Create user':'Save'}</button><button class="btn ghost block" style="margin-top:8px" id="backUsers">Back</button>`);
+}
+async function saveUser(){
+  const user={email:$('#uEmail').value.trim(),name:$('#uName').value.trim(),role:$('#uRole').value,location:$('#uLoc').value,active:$('#uActive')?$('#uActive').checked:true};
+  if(!user.email){toast('Email needed');return}
+  try{const j=await SB.post({action:'saveUser',user});USERS=j.users||USERS;if(j.tempPassword)showTemp(user.email,j.tempPassword,j.users);else{toast('Saved ✓');renderUsers()}}catch(e){toast(e.message)}
+}
+function showTemp(email,pw,users){
+  if(users)USERS=users;
+  const link=location.origin+location.pathname;
+  const msg=`TL Pathak Stock Live\n${link}\nEmail: ${email}\nTemporary password: ${pw}\n(You’ll choose your own password when you sign in.)`;
+  openSheet(`<div class="sh-t">Temporary password</div><div class="sh-s">Shown only once. Send it to ${esc(email)}.</div>
+  <div class="card" style="text-align:center"><div class="num" style="font-size:30px;letter-spacing:.06em">${esc(pw)}</div></div>
+  <button class="btn block" id="copyTemp" data-msg="${esc(msg)}">Copy sign-in details</button><a class="btn block" style="background:#1FA855;text-decoration:none;margin-top:8px" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${IC.wa.replace('<svg','<svg width="20" height="20"')} Send on WhatsApp</a>
+  <button class="btn ghost block" style="margin-top:8px" id="backUsers">Back to users</button>`);
+}
 /* ================= boot ================= */
 let namesBusy=false;
 async function resolveNames(){if(!K.user||!K.user.profiles||namesBusy)return;const ids=[...new Set([...S.items.flatMap(i=>[i.addedBy,i.updatedBy]),...S.log.map(l=>l.by),...S.purchases.map(p=>p.by),...S.sales.map(p=>p.by)].filter(x=>x&&typeof x==='string'&&!(x in names)))];if(!ids.length)return;namesBusy=true;try{const ps=await K.user.profiles(ids);ids.forEach(id=>{names[id]=(ps&&ps[id]&&ps[id].name)||'Someone'});render()}catch(e){}namesBusy=false}
 const h0=location.hash.slice(1);if(VIEWS.includes(h0))ui.view=h0;if(window._startQ)ui.view='stock';
 renderView();
 (async()=>{
-  if(CFG.api&&CFG.token){MODE='sheet';SB._started=true;renderView();await SB.init();return}
+  if(CFG.api&&CFG.session&&CFG.user){if(CFG.user.mustChange){MODE='changepw';renderView();return}startSheet();return}
   if(typeof window.claude==='undefined'||!window.claude||!window.claude.use){
-    // On GitHub Pages: read the server URL from config.json so staff only need the team key
+    // On GitHub Pages: read the server link from config.json so people only sign in
     if(!CFG.api){try{const r=await fetch('config.json',{cache:'no-store'});const c=await r.json();if(c&&c.apiUrl){CFG.api=c.apiUrl;lsSet('tlp_api',CFG.api)}}catch(e){}}
-    MODE='none';setLive('setup');renderView();return}
+    MODE=CFG.api?'login':'none';setLive('setup');renderView();return}
   const db=await window.claude.use('db');
   if(!db){MODE='none';setLive('setup');banner('Open this page signed in to Claude to see live stock.');renderView();return}
   MODE='claude';K.db=db;

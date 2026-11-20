@@ -3,10 +3,11 @@
  * ------------------------------------------------------
  * Paste into Extensions → Apps Script of your TL Pathak Google Sheet
  * (the same sheet your dashboard reads). Then:
- *   1. Run setup() once (approve permissions).
+ *   1. Run setup() once (approve permissions). It creates the admin account pathakh@gmail.com
+ *      and prints a ONE-TIME temporary password in the Execution log (View → Logs). Sign in with it;
+ *      the app makes you choose your own password straight away.
+ *      (Locked out? Run resetAdminPassword() – it prints a new temporary password.)
  *   2. Project Settings → Script properties → set:
- *        TOKEN        = a team key, e.g. tlp-stock-4821   (staff need this)
- *        ADMIN_PIN    = your admin PIN (add/rename locations, delete records)
  *        GEMINI_KEY   = your Gemini API key (photo reading + "Ask the stock")
  *        GEMINI_MODEL = optional, default gemini-3.8-flash (any current model id from ai.google.dev/pricing)
  *   3. Deploy → New deployment → Web app → Execute as: Me, Who has access: Anyone.
@@ -14,7 +15,8 @@
  *
  * Sheets created: Stock, Stock_Locations, Stock_Log, Purchase_Invoices, Purchases
  *   Purchases = one row per invoice line (group, rate, landed cost) → your dashboard reads buy prices from here.
- *   Purchase data is only returned to requests carrying the ADMIN_PIN.
+ *   Purchase data, buy prices and price lists are only returned to admin accounts.
+ * Users: Stock_Users (email, name, role admin|staff|viewer, branch) – passwords stored only as salted hashes.
  * Sales: Sales_Invoices (one row per bill), Sales (one row per line), Clients (one row per customer — your CRM list).
  */
 
@@ -27,6 +29,9 @@ const CLI_COLS = ['key','name','contactPerson','phone','email','gstin','address'
 const PL_COLS = ['id','manufacturer','brand','validFrom','currency','discount','terms','fileName','pages','itemCount','by','createdAt'];
 const PLI_COLS = ['listId','manufacturer','validFrom','category','group','model','desc','specs','listPrice','gst','priceIncludesGst','netPrice','unit','notes','type','size'];
 const SH_PL = 'Price_Lists', SH_PLI = 'Price_List_Items';
+const SH_USR = 'Stock_Users', USR_COLS = ['email','name','role','location','active','salt','passHash','mustChange','createdAt','lastLogin'];
+const OWNER_EMAIL = 'pathakh@gmail.com';
+const ROLES = ['admin','staff','viewer'];
 const SH_SINV = 'Sales_Invoices', SH_SAL = 'Sales', SH_CLI = 'Clients';
 const PUR_COLS = ['invoiceId','date','supplier','invoiceNo','group','desc','hsn','qty','unit','rate','amount','gst','landedPerUnit','locationName'];
 const ITEM_COLS = ['id','name','category','type','size','group','brand','model','serial','condition','specsJson','specsText',
@@ -60,10 +65,18 @@ function setup() {
   folder_();
   folder_('INV_FOLDER', 'TL Pathak Purchase Invoices');
   folder_('SALE_FOLDER', 'TL Pathak Sales Invoices');
-  if (!P.getProperty('TOKEN')) P.setProperty('TOKEN', 'tlp-stock-' + Math.floor(1000 + Math.random() * 9000));
-  if (!P.getProperty('ADMIN_PIN')) P.setProperty('ADMIN_PIN', '0000');
+  ensure_(ss, SH_USR, USR_COLS);
   bump_();
-  Logger.log('Done. TOKEN = ' + P.getProperty('TOKEN') + ' — change ADMIN_PIN and add GEMINI_KEY in Script properties.');
+  if (!findUser_(OWNER_EMAIL)) {
+    const tmp = upsertUser_({ email: OWNER_EMAIL, name: 'Hitesh Pathak', role: 'admin', active: true }, true);
+    Logger.log('Admin account created: ' + OWNER_EMAIL + '   ONE-TIME password: ' + tmp + '   (you will set your own at first sign-in)');
+  } else Logger.log('Setup done. Admin ' + OWNER_EMAIL + ' already exists (run resetAdminPassword() if you forgot the password).');
+  Logger.log('Add GEMINI_KEY in Project Settings → Script properties.');
+}
+function resetAdminPassword() {
+  ensure_(ss_(), SH_USR, USR_COLS);
+  const tmp = upsertUser_({ email: OWNER_EMAIL, name: (findUser_(OWNER_EMAIL) || {}).name || 'Hitesh Pathak', role: 'admin', active: true }, true);
+  Logger.log('New ONE-TIME password for ' + OWNER_EMAIL + ': ' + tmp);
 }
 function ss_() { const id = P.getProperty('SHEET_ID'); return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet(); }
 function ensure_(ss, name, cols) {
@@ -97,17 +110,32 @@ function out_(o, cb) {
 function handle_(p, isPost) {
   const cb = p.callback;
   try {
-    if (String(p.token || '') !== String(P.getProperty('TOKEN') || '')) return out_({ ok: false, error: 'Wrong team key' }, cb);
     const a = p.action || 'all';
-    const admin = String(p.pin || '') !== '' && String(p.pin) === String(P.getProperty('ADMIN_PIN'));
+    if (a === 'login') return out_(login_(String(p.email || ''), String(p.password || '')), cb);
+    const me = session_(String(p.session || ''));
+    if (!me) return out_({ ok: false, error: 'SIGNED_OUT' }, cb);
+    if (a === 'logout') { P.deleteProperty('S_' + p.session); return out_({ ok: true }, cb); }
+    if (a === 'changePassword') return out_(changePw_(me, String(p.old || ''), String(p.password || '')), cb);
+    if (me.mustChange) return out_({ ok: false, error: 'CHANGE_PASSWORD' }, cb);
+    if (a === 'me') return out_({ ok: true, user: pub_(me) }, cb);
+    const admin = me.role === 'admin', viewer = me.role === 'viewer';
+    if (a === 'users') { if (!admin) return out_({ ok: false, error: 'Admins only' }, cb); return out_({ ok: true, users: rows_(SH_USR, USR_COLS).map(pub_) }, cb); }
+    if (a === 'saveUser' || a === 'resetPassword') {
+      if (!admin) return out_({ ok: false, error: 'Admins only' }, cb);
+      const u = p.user || {}; if (a === 'resetPassword') { const ex = findUser_(p.email); if (!ex) throw new Error('No such user'); u.email = ex.email; u.name = ex.name; u.role = ex.role; u.location = ex.location; u.active = true; }
+      if (String(u.email).toLowerCase() === OWNER_EMAIL && (u.role !== 'admin' || u.active === false)) throw new Error('The owner account must stay an active admin');
+      const isNew = !findUser_(u.email);
+      const tmp = upsertUser_(u, a === 'resetPassword' || isNew);
+      return out_({ ok: true, tempPassword: tmp || '', users: rows_(SH_USR, USR_COLS).map(pub_) }, cb);
+    }
     if (!isPost) {
       if (a === 'ver') return out_({ ok: true, ver: P.getProperty('VER') || '0' }, cb);
       if (a === 'all') return out_({ ok: true, data: state_(admin) }, cb);
-      if (a === 'buyPrices') { if (!admin) return out_({ ok: false, error: 'Admin PIN needed' }, cb); return out_({ ok: true, data: buyPrices_() }, cb); }
+      if (a === 'buyPrices') { if (!admin) return out_({ ok: false, error: 'Admins only' }, cb); return out_({ ok: true, data: buyPrices_() }, cb); }
       if (a === 'summary') return out_({ ok: true, data: summary_(p.q || '', p.location || '') }, cb);
-      if (a === 'checkPin') return out_({ ok: String(p.pin) === String(P.getProperty('ADMIN_PIN')) }, cb);
       return out_({ ok: false, error: 'Unknown action' }, cb);
     }
+    if (viewer) return out_({ ok: false, error: 'Your account is view-only' });
     if (a === 'vision') return out_({ ok: true, result: vision_(String(p.prompt || ''), p.images || []) });
     if (a === 'json') return out_({ ok: true, result: jsonText_(String(p.prompt || '')) });
     if (a === 'text') return out_({ ok: true, answer: gemini_([{ text: String(p.prompt || '').slice(0, 200000) }], false) });
@@ -115,7 +143,7 @@ function handle_(p, isPost) {
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
-      const by = String(p.by || 'Someone').slice(0, 40);
+      const by = String(me.name || me.email).slice(0, 40);
       let res = {};
       switch (a) {
         case 'addItem': res = addItem_(p.item || {}, p.photos || [], by); break;
@@ -124,15 +152,15 @@ function handle_(p, isPost) {
         case 'move': res = move_(p.id, p.to, +p.qty || 1, p.status || 'In stock', p.note || '', by); break;
         case 'sell': res = sell_(p.id, +p.qty || 1, p.note || '', by); break;
         case 'reserve': res = reserve_(p.id, !!p.on, p.name || '', by); break;
-        case 'deleteItem': if (!admin) throw new Error('Admin PIN needed'); res = deleteItem_(p.id, by); break;
-        case 'saveLocation': if (!admin) throw new Error('Admin PIN needed'); res = saveLoc_(p.loc || {}); break;
-        case 'deleteLocation': if (!admin) throw new Error('Admin PIN needed'); res = deleteLoc_(p.id); break;
-        case 'savePurchase': if (!admin) throw new Error('Admin PIN needed'); res = savePurchase_(p.rec || {}, p.photos || [], by); break;
+        case 'deleteItem': if (!admin) throw new Error('Admins only'); res = deleteItem_(p.id, by); break;
+        case 'saveLocation': if (!admin) throw new Error('Admins only'); res = saveLoc_(p.loc || {}); break;
+        case 'deleteLocation': if (!admin) throw new Error('Admins only'); res = deleteLoc_(p.id); break;
+        case 'savePurchase': if (!admin) throw new Error('Admins only'); res = savePurchase_(p.rec || {}, p.photos || [], by); break;
         case 'saveSale': res = saveSale_(p.rec || {}, p.photos || [], by); break;
-        case 'deleteSale': if (!admin) throw new Error('Admin PIN needed'); res = deleteSale_(p.id); break;
-        case 'savePriceList': if (!admin) throw new Error('Admin PIN needed'); res = savePriceList_(p.rec || {}, p.photos || [], by); break;
-        case 'deletePriceList': if (!admin) throw new Error('Admin PIN needed'); res = deletePriceList_(p.id); break;
-        case 'deletePurchase': if (!admin) throw new Error('Admin PIN needed'); res = deletePurchase_(p.id); break;
+        case 'deleteSale': if (!admin) throw new Error('Admins only'); res = deleteSale_(p.id); break;
+        case 'savePriceList': if (!admin) throw new Error('Admins only'); res = savePriceList_(p.rec || {}, p.photos || [], by); break;
+        case 'deletePriceList': if (!admin) throw new Error('Admins only'); res = deletePriceList_(p.id); break;
+        case 'deletePurchase': if (!admin) throw new Error('Admins only'); res = deletePurchase_(p.id); break;
         default: throw new Error('Unknown action');
       }
       bump_();
@@ -474,3 +502,60 @@ function deletePriceList_(id) {
   rows_(SH_PLI, PLI_COLS).filter(x => String(x.listId) === String(id)).map(x => x._row).sort((a, b) => b - a).forEach(n => ss.getSheetByName(SH_PLI).deleteRow(n));
   return {};
 }
+
+/* ---------------- users & sign-in ---------------- */
+function norm_(e) { return String(e || '').trim().toLowerCase(); }
+function findUser_(email) { const e = norm_(email); return e ? rows_(SH_USR, USR_COLS).find(u => norm_(u.email) === e) || null : null; }
+function pub_(u) { return { email: norm_(u.email), name: u.name || '', role: u.role || 'staff', location: u.location || '', active: u.active === true || u.active === 'TRUE', mustChange: u.mustChange === true || u.mustChange === 'TRUE', lastLogin: +u.lastLogin || 0 }; }
+function hash_(pw, salt) {
+  let h = salt + '|' + pw;
+  for (let i = 0; i < 300; i++) h = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, h + salt, Utilities.Charset.UTF_8));
+  return h;
+}
+function tempPw_() { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 10; i++) s += c.charAt(Math.floor(Math.random() * c.length)); return s; }
+function upsertUser_(u, newTempPassword) {
+  const email = norm_(u.email);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Enter a valid email');
+  const sh = ss_().getSheetByName(SH_USR), ex = findUser_(email), now = Date.now();
+  const role = ROLES.indexOf(u.role) >= 0 ? u.role : (ex ? ex.role : 'staff');
+  const rec = ex ? Object.assign({}, ex) : { email: email, createdAt: now, salt: '', passHash: '', mustChange: true, lastLogin: '' };
+  rec.name = String(u.name || rec.name || email.split('@')[0]).slice(0, 60); rec.role = role; rec.location = u.location !== undefined ? u.location : (rec.location || '');
+  rec.active = u.active === undefined ? (ex ? (ex.active === true || ex.active === 'TRUE') : true) : !!u.active;
+  let tmp = '';
+  if (newTempPassword) { tmp = tempPw_(); rec.salt = Utilities.getUuid(); rec.passHash = hash_(tmp, rec.salt); rec.mustChange = true; }
+  const row = USR_COLS.map(k => rec[k] === undefined ? '' : rec[k]);
+  if (ex) sh.getRange(ex._row, 1, 1, row.length).setValues([row]); else sh.appendRow(row);
+  if (ex && !rec.active) endSessions_(email);
+  return tmp;
+}
+function login_(email, pw) {
+  const e = norm_(email), cache = CacheService.getScriptCache(), k = 'lf_' + e, fails = +(cache.get(k) || 0);
+  if (fails >= 8) return { ok: false, error: 'Too many wrong tries — wait 15 minutes' };
+  const u = findUser_(e);
+  if (!u || !(u.active === true || u.active === 'TRUE') || !u.passHash || hash_(pw, u.salt) !== u.passHash) { cache.put(k, String(fails + 1), 900); Utilities.sleep(400); return { ok: false, error: 'Wrong email or password' }; }
+  cache.remove(k);
+  const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  P.setProperty('S_' + token, JSON.stringify({ email: e, exp: Date.now() + 30 * 864e5 }));
+  ss_().getSheetByName(SH_USR).getRange(u._row, USR_COLS.indexOf('lastLogin') + 1).setValue(Date.now());
+  cleanSessions_();
+  return { ok: true, session: token, user: pub_(u) };
+}
+function session_(token) {
+  if (!token || token.length < 40) return null;
+  let s; try { s = JSON.parse(P.getProperty('S_' + token) || 'null'); } catch (e) { return null; }
+  if (!s || s.exp < Date.now()) { if (s) P.deleteProperty('S_' + token); return null; }
+  const u = findUser_(s.email);
+  if (!u || !(u.active === true || u.active === 'TRUE')) return null;
+  const pu = pub_(u); pu._row = u._row; pu.salt = u.salt; pu.passHash = u.passHash; return pu;
+}
+function changePw_(me, old, pw) {
+  if (hash_(old, me.salt) !== me.passHash) return { ok: false, error: 'Current password is wrong' };
+  if (pw.length < 8) return { ok: false, error: 'Use at least 8 characters' };
+  if (pw === old) return { ok: false, error: 'Choose a new password' };
+  const salt = Utilities.getUuid(), sh = ss_().getSheetByName(SH_USR);
+  sh.getRange(me._row, USR_COLS.indexOf('salt') + 1, 1, 3).setValues([[salt, hash_(pw, salt), false]]);
+  me.mustChange = false;
+  return { ok: true, user: pub_(Object.assign({}, me, { mustChange: false })) };
+}
+function endSessions_(email) { const all = P.getProperties(); Object.keys(all).forEach(k => { if (k.indexOf('S_') === 0) { try { if (JSON.parse(all[k]).email === email) P.deleteProperty(k); } catch (e) {} } }); }
+function cleanSessions_() { const all = P.getProperties(), now = Date.now(); Object.keys(all).forEach(k => { if (k.indexOf('S_') === 0) { try { if (JSON.parse(all[k]).exp < now) P.deleteProperty(k); } catch (e) { P.deleteProperty(k); } } }); }

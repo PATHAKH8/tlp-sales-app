@@ -5,34 +5,46 @@
  *   <div id="tlp-stock"></div>
  *   <script src="stock-widget.js"></script>      (or paste this whole file inside a <script> tag)
  *   <script>
- *     TLPStock.config({ api:'https://script.google.com/macros/s/XXXX/exec', token:'tlp-stock-1234',
- *                       appUrl:'https://YOUR-GITHUB.github.io/stock/stock.html' });
+ *     TLPStock.config({ api:'https://script.google.com/macros/s/XXXX/exec',
+ *                       appUrl:'https://pathakh8.github.io/tlp-sales-app/stock/' });
+ *     // Uses the same email + password as the stock app (sign-in is remembered on this browser).
+ *     // If nobody is signed in, the card shows a small sign-in form.
  *     TLPStock.mount('#tlp-stock');          // live summary card: totals, per location, search
  *     // or TLPStock.embed('#tlp-stock');    // the full stock app inside a dashboard tab
  *   </script>
  *
- * Buy prices (ADMIN ONLY - needs your admin PIN; never put the PIN in a page staff can open):
- *   const rows = await TLPStock.buyPrices('YOUR_ADMIN_PIN');
+ * Buy prices (ADMIN accounts only):
+ *   await TLPStock.login('pathakh@gmail.com', password);   // once per browser, or sign in on the card
+ *   const rows = await TLPStock.buyPrices();
  *   // -> [{ group:'All-Geared Lathe · 6 ft', last:185000, lastLanded:187415, avg, min, supplier, date, buys }]
- *   const p = await TLPStock.buyPrice('6 ft lathe', 'YOUR_ADMIN_PIN');   // best match for one product
+ *   const p = await TLPStock.buyPrice('6 ft lathe');   // best match for one product
  *
  * For product rows / quotes:
  *   const a = await TLPStock.availability('6 ft lathe');
  *   // → { total:4, free:3, text:'Howrah HQ Showroom 3 · Bengaluru Showroom 1', groups:[...] }
  */
 (function (w) {
-  const C = { api: '', token: '', appUrl: '', poll: 20000 };
+  const C = { api: '', appUrl: '', poll: 20000 };
+  const ls = { get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+  let session = ls.get('tlp_sess'), mounted = [];
   let cache = null, ver = '', timers = [];
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   async function get(params) {
-    if (!C.api) throw new Error('TLPStock: call config({api, token}) first');
-    const u = C.api + (C.api.includes('?') ? '&' : '?') + new URLSearchParams({ ...params, token: C.token });
+    if (!C.api) throw new Error('TLPStock: call config({api}) first');
+    const u = C.api + (C.api.includes('?') ? '&' : '?') + new URLSearchParams({ session: session, ...params });
     const r = await fetch(u, { redirect: 'follow' });
     const j = await r.json();
-    if (!j.ok) throw new Error(j.error || 'Stock server error');
+    if (!j.ok) { const e = new Error(j.error === 'SIGNED_OUT' ? 'Please sign in' : j.error === 'CHANGE_PASSWORD' ? 'Open the stock app once to set your password' : (j.error || 'Stock server error')); e.code = j.error; throw e; }
     return j;
   }
+  async function login(email, password) {
+    const r = await fetch(C.api, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'login', email: email, password: password }) });
+    const j = await r.json(); if (!j.ok) throw new Error(j.error || 'Sign-in failed');
+    session = j.session; ls.set('tlp_sess', session); ls.set('tlp_user', JSON.stringify(j.user)); cache = null;
+    mounted.forEach(f => f()); return j.user;
+  }
+  function logout() { session = ''; ls.set('tlp_sess', ''); cache = null; mounted.forEach(f => f()); }
   async function summary(q, location) {
     if (!q && !location && cache) {
       try { const v = await get({ action: 'ver' }); if (v.ver === ver) return cache; } catch (e) { return cache; }
@@ -48,10 +60,10 @@
     return { total: d.total, free: d.free, groups: d.groups,
       text: Object.entries(per).sort((a, b) => b[1] - a[1]).map(([l, n]) => l + ' ' + n).join(' \u00B7 ') || 'Not in stock' };
   }
-  async function buyPrices(pin) { const j = await get({ action: 'buyPrices', pin: pin || '' }); return j.data; }
-  async function buyPrice(query, pin) {
+  async function buyPrices() { const j = await get({ action: 'buyPrices' }); return j.data; }
+  async function buyPrice(query) {
     const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
-    const rows = await buyPrices(pin);
+    const rows = await buyPrices();
     return rows.find(r => words.every(w => r.group.toLowerCase().indexOf(w) >= 0)) || null;
   }
   function appLink(q) { return C.appUrl ? C.appUrl + (q ? (C.appUrl.includes('?') ? '&' : '?') + 'q=' + encodeURIComponent(q) : '') + '#stock' : '#'; }
@@ -88,8 +100,14 @@
         $('.tlps-stats').innerHTML = `<div class="tlps-s hi"><b>${d.total}</b><span>In stock</span></div><div class="tlps-s"><b>${d.free}</b><span>Free to sell</span></div><div class="tlps-s"><b>${d.groups.length}</b><span>Groups</span></div>`;
         $('.tlps-loc').innerHTML = Object.entries(d.byLocation).sort((a, b) => b[1] - a[1]).map(([l, n]) => `<span>${esc(l.replace(/\s*(Showroom|Warehouse)\s*/i, ' ').trim())} ${n}</span>`).join('');
         $('.tlps-list').innerHTML = d.groups.length ? d.groups.map(g => `<a class="tlps-g" target="_blank" rel="noopener" href="${esc(appLink(g.group))}"><i style="${/^https:\/\//.test(g.photo) ? `background-image:url('${esc(g.photo)}')` : ''}"></i><div><b>${esc(g.group)}</b><small>${Object.entries(g.byLocation).map(([l, n]) => esc(l.replace(/\s*(Showroom|Warehouse)\s*/i, ' ').trim()) + ' ' + n).join(' \u00B7 ')}${g.reserved ? ' \u00B7 ' + g.reserved + ' reserved' : ''}</small></div><em>${g.total}<small><br>${g.free} free</small></em></a>`).join('') : `<div class="tlps-e">${qv ? 'Not in stock anywhere' : 'No stock recorded yet'}</div>`;
-      } catch (e) { $('.tlps-list').innerHTML = `<div class="tlps-e">Cannot reach stock: ${esc(e.message)}</div>`; }
+      } catch (e) {
+        if (e.code === 'SIGNED_OUT') {
+          $('.tlps-list').innerHTML = `<form class="tlps-login"><input class="tlps-in" type="email" placeholder="Email" autocomplete="username"><input class="tlps-in" type="password" placeholder="Password" autocomplete="current-password"><button class="tlps-open" style="border:0;width:100%;padding:10px" type="submit">Sign in to see live stock</button><div class="tlps-e" style="color:#D7262E"></div></form>`;
+          const f = $('.tlps-login'); f.onsubmit = async ev => { ev.preventDefault(); const i = f.querySelectorAll('input'); try { await login(i[0].value.trim(), i[1].value); } catch (er) { f.querySelector('.tlps-e').textContent = er.message; } };
+        } else $('.tlps-list').innerHTML = `<div class="tlps-e">Cannot reach stock: ${esc(e.message)}</div>`;
+      }
     }
+    mounted.push(draw);
     $('.tlps-in').addEventListener('input', e => { qv = e.target.value.trim(); clearTimeout(tq); tq = setTimeout(draw, 350); });
     draw();
     timers.push(setInterval(() => { if (document.visibilityState === 'visible' && !qv) draw(); }, C.poll));
@@ -97,9 +115,9 @@
   function embed(sel, opts) {
     const el = typeof sel === 'string' ? document.querySelector(sel) : sel; if (!el || !C.appUrl) return;
     const h = (opts && opts.height) || '85vh';
-    const p = new URLSearchParams({ embed: '1', api: C.api, token: C.token });
+    const p = new URLSearchParams({ embed: '1', api: C.api });
     if (opts && opts.location) p.set('loc', opts.location);
     el.innerHTML = `<iframe src="${esc(C.appUrl + (C.appUrl.includes('?') ? '&' : '?') + p)}" style="width:100%;height:${esc(h)};border:0;border-radius:14px;background:#F2F3EF" allow="camera" title="TL Pathak Stock Live"></iframe>`;
   }
-  w.TLPStock = { config: o => Object.assign(C, o), mount, embed, summary, availability, buyPrices, buyPrice, appLink };
+  w.TLPStock = { config: o => Object.assign(C, o), login, logout, mount, embed, summary, availability, buyPrices, buyPrice, appLink };
 })(window);
