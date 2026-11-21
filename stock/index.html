@@ -311,7 +311,7 @@ function okUrl(u){return typeof u==='string'&&(/^data:image\//.test(u)||/^https:
 // Drive "thumbnail" links only load when the phone is signed in to that Google account; this public image address loads everywhere
 function fixImg(u,w){if(typeof u!=='string')return u;const m=u.match(/drive\.google\.com\/(?:thumbnail\?id=|uc\?[^#]*?id=|file\/d\/)([\w-]{20,})(?:.*?sz=w(\d+))?/);return m?`https://lh3.googleusercontent.com/d/${m[1]}=w${w||m[2]||800}`:u}
 function fullUrl(u){return fixImg(u,2000)}
-function cssUrl(u){u=fixImg(u);return okUrl(u)?`background-image:url("${u.replace(/["\\()]/g,m=>encodeURIComponent(m))}")`:''}
+function cssUrl(u){u=fixImg(u);return okUrl(u)?`background-image:url('${u.replace(/['"\\()<>\s]/g,m=>encodeURIComponent(m))}')`:''}
 function locById(id){return S.locations.find(l=>l.id===id)}
 function locNm(id){const l=locById(id);return l?l.name:'Unassigned'}
 function shortLoc(id){const n=locNm(id);return n.replace(/\s*(Showroom|Warehouse|Godown)\s*/i,'').trim()||n}

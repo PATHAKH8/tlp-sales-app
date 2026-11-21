@@ -28,6 +28,7 @@
   const ls = { get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   let session = ls.get('tlp_sess'), mounted = [];
   let cache = null, ver = '', timers = [];
+  const fix = u => { const m = String(u).match(/drive\.google\.com\/(?:thumbnail\?id=|uc\?[^#]*?id=|file\/d\/)([\w-]{20,})/); return m ? 'https://lh3.googleusercontent.com/d/' + m[1] + '=w300' : u; };
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   async function get(params) {
@@ -99,7 +100,7 @@
         const d = await summary(qv, o.location);
         $('.tlps-stats').innerHTML = `<div class="tlps-s hi"><b>${d.total}</b><span>In stock</span></div><div class="tlps-s"><b>${d.free}</b><span>Free to sell</span></div><div class="tlps-s"><b>${d.groups.length}</b><span>Groups</span></div>`;
         $('.tlps-loc').innerHTML = Object.entries(d.byLocation).sort((a, b) => b[1] - a[1]).map(([l, n]) => `<span>${esc(l.replace(/\s*(Showroom|Warehouse)\s*/i, ' ').trim())} ${n}</span>`).join('');
-        $('.tlps-list').innerHTML = d.groups.length ? d.groups.map(g => `<a class="tlps-g" target="_blank" rel="noopener" href="${esc(appLink(g.group))}"><i style="${/^https:\/\//.test(g.photo) ? `background-image:url('${esc(g.photo)}')` : ''}"></i><div><b>${esc(g.group)}</b><small>${Object.entries(g.byLocation).map(([l, n]) => esc(l.replace(/\s*(Showroom|Warehouse)\s*/i, ' ').trim()) + ' ' + n).join(' \u00B7 ')}${g.reserved ? ' \u00B7 ' + g.reserved + ' reserved' : ''}</small></div><em>${g.total}<small><br>${g.free} free</small></em></a>`).join('') : `<div class="tlps-e">${qv ? 'Not in stock anywhere' : 'No stock recorded yet'}</div>`;
+        $('.tlps-list').innerHTML = d.groups.length ? d.groups.map(g => `<a class="tlps-g" target="_blank" rel="noopener" href="${esc(appLink(g.group))}"><i style="${/^https:\/\//.test(g.photo) ? `background-image:url('${esc(fix(g.photo))}')` : ''}"></i><div><b>${esc(g.group)}</b><small>${Object.entries(g.byLocation).map(([l, n]) => esc(l.replace(/\s*(Showroom|Warehouse)\s*/i, ' ').trim()) + ' ' + n).join(' \u00B7 ')}${g.reserved ? ' \u00B7 ' + g.reserved + ' reserved' : ''}</small></div><em>${g.total}<small><br>${g.free} free</small></em></a>`).join('') : `<div class="tlps-e">${qv ? 'Not in stock anywhere' : 'No stock recorded yet'}</div>`;
       } catch (e) {
         if (e.code === 'SIGNED_OUT') {
           $('.tlps-list').innerHTML = `<form class="tlps-login"><input class="tlps-in" type="email" placeholder="Email" autocomplete="username"><input class="tlps-in" type="password" placeholder="Password" autocomplete="current-password"><button class="tlps-open" style="border:0;width:100%;padding:10px" type="submit">Sign in to see live stock</button><div class="tlps-e" style="color:#D7262E"></div></form>`;
