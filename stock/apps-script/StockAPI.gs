@@ -235,7 +235,7 @@ function savePhotos_(arr, label, inv) {
     const blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], (label || 'machine').replace(/[^\w\- ]/g, '').slice(0, 40) + '_' + Date.now() + '_' + ix + '.jpg');
     const file = f.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    urls.push('https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=' + (inv ? 'w1600' : 'w600'));
+    urls.push('https://lh3.googleusercontent.com/d/' + file.getId() + '=' + (inv ? 'w1600' : 'w800'));   // public image address: loads on any phone
   });
   return urls;
 }

@@ -308,7 +308,10 @@ const meTag=()=>MODE==='claude'?(K.meId||''):((CFG.user&&CFG.user.name)||'Someon
 const $=s=>document.querySelector(s);
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function okUrl(u){return typeof u==='string'&&(/^data:image\//.test(u)||/^https:\/\//.test(u)||/^\/_blob\/[\w-]+$/.test(u))}
-function cssUrl(u){return okUrl(u)?`background-image:url("${u.replace(/["\\()]/g,m=>encodeURIComponent(m))}")`:''}
+// Drive "thumbnail" links only load when the phone is signed in to that Google account; this public image address loads everywhere
+function fixImg(u,w){if(typeof u!=='string')return u;const m=u.match(/drive\.google\.com\/(?:thumbnail\?id=|uc\?[^#]*?id=|file\/d\/)([\w-]{20,})(?:.*?sz=w(\d+))?/);return m?`https://lh3.googleusercontent.com/d/${m[1]}=w${w||m[2]||800}`:u}
+function fullUrl(u){return fixImg(u,2000)}
+function cssUrl(u){u=fixImg(u);return okUrl(u)?`background-image:url("${u.replace(/["\\()]/g,m=>encodeURIComponent(m))}")`:''}
 function locById(id){return S.locations.find(l=>l.id===id)}
 function locNm(id){const l=locById(id);return l?l.name:'Unassigned'}
 function shortLoc(id){const n=locNm(id);return n.replace(/\s*(Showroom|Warehouse|Godown)\s*/i,'').trim()||n}
@@ -744,7 +747,7 @@ function buyV(v){
 function openPurchase(id){
   const p=S.purchases.find(x=>x.id===id);if(!p)return;
   openSheet(`<div class="sh-t">${esc(p.supplier||'Supplier')}</div><div class="sh-s">Invoice ${esc(p.invoiceNo||'—')} · ${esc(fdate(p.date))}${p.gstin?' · GSTIN '+esc(p.gstin):''}<br>Received at ${esc(locNm(p.locationId))} · saved by ${esc(who(p.by))} ${esc(ago(p.createdAt))}</div>
-   ${(p.images||[]).length?`<div class="pages">${p.images.filter(okUrl).map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener" style="${cssUrl(u)}" aria-label="Open page"></a>`).join('')}</div><div class="muted" style="margin:-6px 0 10px">Tap a page to open it full size.</div>`:''}
+   ${(p.images||[]).length?`<div class="pages">${p.images.filter(okUrl).map(u=>`<a href="${esc(fullUrl(u))}" target="_blank" rel="noopener" style="${cssUrl(u)}" aria-label="Open page"></a>`).join('')}</div><div class="muted" style="margin:-6px 0 10px">Tap a page to open it full size.</div>`:''}
    <div class="card" style="padding:8px 10px;overflow-x:auto"><table class="tbl"><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr>
    ${(p.lines||[]).map(l=>`<tr><td>${esc(l.desc)}${l.group?`<br><span class="pill">${esc(l.group)}</span>`:''}${l.gst?` <small class="muted">GST ${esc(l.gst)}%</small>`:''}</td><td class="n">${esc(l.qty)}</td><td class="n">${inr(l.rate)}</td><td class="n">${inr(l.amount)}</td></tr>`).join('')}
    </table></div>
@@ -778,7 +781,7 @@ function openSheet(html){$('#sheetCard').innerHTML='<div class="grab"></div>'+ht
 function closeSheet(){$('#sheet').classList.add('hidden');$('#sheetCard').innerHTML='';sheetItem=null}
 function openItem(id){
   const i=S.items.find(x=>x.id===id);if(!i){closeSheet();return}sheetItem=id;const bp=buyFor(groupOf(i));
-  openSheet(`${i.photos&&i.photos[0]?`<div class="hero-img" style="${cssUrl(i.photos[0])}"></div>`:''}${i.photos&&i.photos[1]?`<div class="hero-img" style="${cssUrl(i.photos[1])};aspect-ratio:16/9"></div>`:''}
+  openSheet(`${(i.photos||[]).slice(0,2).map((u,k)=>`<a href="${esc(/^https:/.test(fixImg(u))?fullUrl(u):'#')}" target="_blank" rel="noopener" class="hero-img" style="display:block;${cssUrl(u)}${k?';aspect-ratio:16/9':''}"></a>`).join('')}
    <div class="sh-t">${esc(i.name||groupOf(i))}</div><div class="sh-s">${esc(groupOf(i))} · ${esc(i.category||'')}</div>
    ${bp?`<div class="buyline">🔒 ${bp.listOnly?`Price list net <b>${inr(bp.pl.net)}</b> · ${esc(bp.pl.mfr)}`:`Buy price <b>${inr(bp.last)}</b> (landed ${inr(bp.lastLanded)}) · ${esc(bp.supplier)}, ${esc(fdate(bp.date))} · avg ${inr(bp.avg)}${bp.pl?` · list net ${inr(bp.pl.net)}`:''}`}</div>`:''}
    <div class="card"><dl class="kv" style="margin:0">
@@ -1136,7 +1139,7 @@ function openSale(id){
   const s=S.sales.find(x=>x.id===id);if(!s)return;const c=s.client||{};
   let tm=0,has=false;
   openSheet(`<div class="sh-t">${esc(c.name||'Client')}</div><div class="sh-s">Sales invoice ${esc(s.invoiceNo||'—')} · ${esc(fdate(s.date))}${s.seller?' · '+esc(s.seller):''}<br>Sold from ${esc(locNm(s.locationId))} · saved by ${esc(who(s.by))} ${esc(ago(s.createdAt))}</div>
-   ${(s.images||[]).length?`<div class="pages">${s.images.filter(okUrl).map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener" style="${cssUrl(u)}" aria-label="Open page"></a>`).join('')}</div>`:''}
+   ${(s.images||[]).length?`<div class="pages">${s.images.filter(okUrl).map(u=>`<a href="${esc(fullUrl(u))}" target="_blank" rel="noopener" style="${cssUrl(u)}" aria-label="Open page"></a>`).join('')}</div>`:''}
    <div class="card"><dl class="kv" style="margin:0">${c.contactPerson?`<dt>Contact</dt><dd>${esc(c.contactPerson)}</dd>`:''}${c.phone?`<dt>Phone</dt><dd>${esc(c.phone)}</dd>`:''}${c.gstin?`<dt>GSTIN</dt><dd>${esc(c.gstin)}</dd>`:''}${c.email?`<dt>Email</dt><dd>${esc(c.email)}</dd>`:''}${c.address||c.city?`<dt>Address</dt><dd>${esc([c.address,c.city,c.state].filter(Boolean).join(', '))}</dd>`:''}</dl>
    ${c.phone?`<a class="btn block" style="background:#1FA855;text-decoration:none;margin-top:10px" href="https://wa.me/${esc(waNum(c.phone))}" target="_blank" rel="noopener">${IC.wa.replace('<svg','<svg width="20" height="20"')} WhatsApp client</a>`:''}</div>
    <div class="card" style="padding:8px 10px;overflow-x:auto"><table class="tbl"><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr>
@@ -1286,7 +1289,7 @@ function listsV(v,head,t){
 function openPL(id){
   const l=S.pricelists.find(x=>x.id===id);if(!l)return;const cats={};(l.items||[]).forEach(it=>{(cats[it.category]=cats[it.category]||{});(cats[it.category][it.group]=cats[it.category][it.group]||[]).push(it)});
   openSheet(`<div class="sh-t">${esc(l.manufacturer)}</div><div class="sh-s">${esc(l.brand?l.brand+' · ':'')}valid from ${esc(fdate(l.validFrom))}${l.discount?' · our discount '+esc(l.discount)+'%':''}${l.terms?'<br>'+esc(l.terms):''}<br>${esc(l.fileName||'')} · saved by ${esc(who(l.by))} ${esc(ago(l.createdAt))}</div>
-  ${(l.pages||[]).length?`<div class="pages">${l.pages.filter(okUrl).map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener" style="${cssUrl(u)}"></a>`).join('')}</div>`:''}
+  ${(l.pages||[]).length?`<div class="pages">${l.pages.filter(okUrl).map(u=>`<a href="${esc(fullUrl(u))}" target="_blank" rel="noopener" style="${cssUrl(u)}"></a>`).join('')}</div>`:''}
   ${Object.keys(cats).sort((a,b)=>CATS.indexOf(a)-CATS.indexOf(b)).map(c=>`<div class="cat-h"><span>${esc(c)}</span></div>`+Object.entries(cats[c]).map(([g,arr])=>`<div class="card" style="padding:8px 10px"><b style="font-size:14.5px">${esc(g)}</b><table class="tbl" style="margin-top:4px"><tr><th>Model</th><th style="text-align:right">List</th><th style="text-align:right">Net</th></tr>${arr.map(it=>`<tr><td>${esc(it.model||it.desc)}${it.specs?`<br><small class="muted">${esc(it.specs)}</small>`:''}</td><td class="n">${inr(it.listPrice)}</td><td class="n">${inr(plNet(it,l.discount))}</td></tr>`).join('')}</table></div>`).join('')).join('')}
   <button class="btn ghost block" id="delPL" data-id="${esc(l.id)}" style="color:var(--red)">${IC.del.replace('<svg','<svg width="18" height="18"')} Delete price list</button>`);
 }
