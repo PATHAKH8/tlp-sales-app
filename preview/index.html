@@ -5936,7 +5936,7 @@ async function clickSyncButton() {
     const TLP_LOST_REASONS = ['Price too high', 'Bought elsewhere', 'Not buying now', 'No response', 'Wrong enquiry'];
     const TLP_SRC_COLOR = { IndiaMART: 'bg-orange-100 text-orange-800', Email: 'bg-sky-100 text-sky-800', JustDial: 'bg-amber-100 text-amber-800', TradeIndia: 'bg-violet-100 text-violet-800', Facebook: 'bg-blue-100 text-blue-800', 'Visiting card': 'bg-emerald-100 text-emerald-800', Note: 'bg-slate-100 text-slate-700' };
     let tlpHub = { leads: [], me: null, team: [], error: '', at: 0, tried: false };
-    let tlpLeadView = { q: '', status: 'open', source: '', owner: '', quick: '' };
+    let tlpLeadView = { q: '', status: 'open', source: '', owner: '', quick: '', group: 'date' };
 
     // Identity comes from the login. The app never talks to the Lead Hub itself: it asks our own
     // backend, which signs the call with the e-mail of whoever is signed in. So nobody can read
@@ -6000,6 +6000,34 @@ async function clickSyncButton() {
         }).sort((a, b) => (tlpOverdue(b) - tlpOverdue(a)) || String(b.time).localeCompare(String(a.time)));
     }
 
+    // Leads read better in blocks than as one long list: by the day they came in, or by the
+    // IndiaMART profile they came through, which is also the company that will quote them.
+    const TLP_GROUPS = [['date', 'By date'], ['account', 'By IndiaMART profile'], ['owner', 'By person'], ['', 'One long list']];
+    function tlpDayLabel(t) {
+        const d = String(t || '').slice(0, 10); if (!d) return 'No date';
+        const today = new Date(), day = ms => new Date(today.getTime() - ms * 86400000).toLocaleDateString('en-CA');
+        if (d === day(0)) return 'Today'; if (d === day(1)) return 'Yesterday';
+        const dt = new Date(d + 'T00:00:00'); if (isNaN(dt)) return d;
+        return dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + (dt.getFullYear() !== today.getFullYear() ? ' ' + dt.getFullYear() : '');
+    }
+    function tlpGroupOf(L) {
+        if (tlpLeadView.group === 'date') return tlpDayLabel(L.time);
+        if (tlpLeadView.group === 'account') return L.hub ? (L.account || L.source || 'Other enquiries') : 'Scanned here';
+        if (tlpLeadView.group === 'owner') return L.owner || 'Not given to anyone yet';
+        return '';
+    }
+    function tlpGroupLeads(rows) {
+        if (!tlpLeadView.group) return [['', rows]];
+        const map = new Map();
+        rows.forEach(L => { const k = tlpGroupOf(L); if (!map.has(k)) map.set(k, []); map.get(k).push(L); });
+        const out = [...map.entries()];
+        if (tlpLeadView.group === 'date') {
+            const rank = k => k === 'Today' ? 2 : k === 'Yesterday' ? 1 : 0;
+            out.sort((a, b) => rank(b[0]) - rank(a[0]) || String(b[1][0].time).localeCompare(String(a[1][0].time)));
+        } else out.sort((a, b) => b[1].length - a[1].length);
+        return out;
+    }
+
     function tlpRenderLeads() {
         const box = document.getElementById('leads-list'); if (!box) return;
         const all = tlpAllLeads(), pool = tlpHub.leads.filter(l => !l.owner).map(tlpNormHub);
@@ -6024,12 +6052,15 @@ async function clickSyncButton() {
         if (fbox) fbox.innerHTML = `<input id="lead-q" type="search" value="${tlpE(tlpLeadView.q)}" placeholder="Search name, company, product, phone" oninput="tlpLeadFilter()" class="flex-1 min-w-[170px] border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white">
             <select id="lead-status" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white"><option value="open" ${tlpLeadView.status === 'open' ? 'selected' : ''}>Open leads</option>${TLP_LEAD_STATES.map(s => `<option ${s === tlpLeadView.status ? 'selected' : ''}>${s}</option>`).join('')}<option value="all" ${tlpLeadView.status === 'all' ? 'selected' : ''}>All</option></select>
             ${sel('lead-source', tlpLeadView.source, srcList, 'Every source')}
-            ${tlpHubManager() && ownList.length > 1 ? sel('lead-owner', tlpLeadView.owner, ownList, 'Everyone') : ''}`;
+            ${tlpHubManager() && ownList.length > 1 ? sel('lead-owner', tlpLeadView.owner, ownList, 'Everyone') : ''}
+            <select id="lead-group" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white">${TLP_GROUPS.map(([k, label]) => `<option value="${k}" ${k === tlpLeadView.group ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
 
         const rows = tlpLeadsMatching();
         const cnt = document.getElementById('leads-count');
         if (cnt) cnt.textContent = rows.length + ' of ' + all.length + ' leads' + (tlpHub.at || tlpHub.error ? '' : ' · Hub loading…');
-        box.innerHTML = rows.length ? rows.map(tlpLeadCard).join('') : '<p class="text-xs text-slate-500 py-8 text-center col-span-full">' + (all.length ? 'No lead matches this filter.' : 'No leads yet. Scan a visiting card below, or wait for the Lead Hub to send you one.') + '</p>';
+        box.innerHTML = rows.length
+            ? tlpGroupLeads(rows).map(([label, list]) => (label ? `<h4 class="col-span-full flex items-baseline gap-2 pt-2 first:pt-0"><span class="text-xs font-extrabold text-slate-900">${tlpE(label)}</span><span class="text-[11px] text-slate-500">${list.length} lead${list.length > 1 ? 's' : ''}</span><span class="flex-1 border-b border-slate-200"></span></h4>` : '') + list.map(tlpLeadCard).join('')).join('')
+            : '<p class="text-xs text-slate-500 py-8 text-center col-span-full">' + (all.length ? 'No lead matches this filter.' : 'No leads yet. Scan a visiting card below, or wait for the Lead Hub to send you one.') + '</p>';
         const st = document.getElementById('lead-conn');
         if (st) {
             st.className = 'text-[11px] mt-1 ' + (tlpHub.error ? 'text-rose-700' : 'text-slate-500');
@@ -6082,7 +6113,8 @@ async function clickSyncButton() {
 
     function tlpLeadFilter() {
         const g = id => (document.getElementById(id) || {}).value || '';
-        tlpLeadView = { q: g('lead-q'), status: g('lead-status') || 'open', source: g('lead-source'), owner: g('lead-owner'), quick: tlpLeadView.quick };
+        const grp = document.getElementById('lead-group');
+        tlpLeadView = { q: g('lead-q'), status: g('lead-status') || 'open', source: g('lead-source'), owner: g('lead-owner'), quick: tlpLeadView.quick, group: grp ? grp.value : tlpLeadView.group };
         tlpRenderLeads();
         const el = document.getElementById('lead-q'); if (el && tlpLeadView.q) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }
