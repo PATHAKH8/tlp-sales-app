@@ -5749,8 +5749,7 @@ async function clickSyncButton() {
         const cur = String(u.access || '').trim(), has = p => u.role === 'admin' || !cur || cur.split(',').map(x => x.trim()).indexOf(p) !== -1;
         return `<div class="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t border-slate-100"><span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Can open</span>
             ${TLP_PARTS.map(([p, label]) => `<label class="flex items-center gap-1.5 whitespace-nowrap"><input type="checkbox" ${has(p) ? 'checked' : ''} ${u.role === 'admin' ? 'disabled' : ''} onchange="tlpSetAccess('${u.id}','${p}',this.checked)"> ${label}</label>`).join('')}
-            <span class="flex items-center gap-1.5 ml-auto"><span class="text-slate-500">Phone on quotes</span><input class="${TLP_IN}" style="width:150px" type="tel" value="${tlpE(u.phone === null || u.phone === undefined ? '' : u.phone)}" placeholder="+91 ..." onchange="tlpSetUser('${u.id}','phone',this.value.trim())"></span>
-            <span class="flex items-center gap-1.5"><span class="text-slate-500">Lead Hub key</span><input class="${TLP_IN}" style="width:170px" value="${tlpE(u.hub_key || '')}" placeholder="from the Lead Hub" onchange="tlpSetUser('${u.id}','hub_key',this.value.trim())" title="The personal key the Lead Hub gives this person. Their leads then open on any device they sign into."></span></div>`;
+            <span class="flex items-center gap-1.5 ml-auto"><span class="text-slate-500">Phone on quotes</span><input class="${TLP_IN}" style="width:150px" type="tel" value="${tlpE(u.phone === null || u.phone === undefined ? '' : u.phone)}" placeholder="+91 ..." onchange="tlpSetUser('${u.id}','phone',this.value.trim())"></span></div>`;
     }
 
     // ---------- Quote made by + settings remembered for the next quotation ----------
@@ -5933,29 +5932,29 @@ async function clickSyncButton() {
     // Leads — one place for every enquiry: the Lead Hub (IndiaMART, email, portals) and cards scanned here.
     // Each person signs in and sees the leads given to them; managers see their team's.
     // =====================================================================================================
-    const TLP_HUB_URL = 'https://script.google.com/macros/s/AKfycbx0b0hQGUpDpiAg711Rt6_ipyiqegwQnpDBAdjmvYsN61khQgNoRITGIglfx9jnWQuSFQ/exec';
     const TLP_LEAD_STATES = ['New', 'Contacted', 'Follow-up', 'Quoted', 'Negotiation', 'Won', 'Lost'];
     const TLP_LOST_REASONS = ['Price too high', 'Bought elsewhere', 'Not buying now', 'No response', 'Wrong enquiry'];
     const TLP_SRC_COLOR = { IndiaMART: 'bg-orange-100 text-orange-800', Email: 'bg-sky-100 text-sky-800', JustDial: 'bg-amber-100 text-amber-800', TradeIndia: 'bg-violet-100 text-violet-800', Facebook: 'bg-blue-100 text-blue-800', 'Visiting card': 'bg-emerald-100 text-emerald-800', Note: 'bg-slate-100 text-slate-700' };
     let tlpHub = { leads: [], me: null, team: [], error: '', at: 0, tried: false };
     let tlpLeadView = { q: '', status: 'open', source: '', owner: '', quick: '' };
 
-    // The key belongs to the login, not to the handset: it is read from the signed-in person's own profile.
-    const tlpHubKey = () => String((tlpProfile && tlpProfile.hub_key) || '').trim();
+    // Identity comes from the login. The app never talks to the Lead Hub itself: it asks our own
+    // backend, which signs the call with the e-mail of whoever is signed in. So nobody can read
+    // another person's leads by editing the page, and no key has to be carried on the handset.
     const tlpHubManager = () => !!(tlpHub.me && tlpHub.me.seeAll) || tlpIsAdmin();
-    async function tlpHubCall(action, extra) {
-        const key = tlpHubKey();
-        if (!key) return { ok: false, msg: 'no-key' };
-        const r = await fetch(TLP_HUB_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action, key }, extra || {})) });
-        return r.json();
+    async function tlpHubCall(op, extra) {
+        const r = await tlpApi(Object.assign({ action: 'hub', op }, extra || {}));
+        if (r.error) return { ok: false, msg: r.error.message };
+        return Object.assign({ ok: true }, r.data || {});
     }
     async function tlpLoadHubLeads(quiet) {
         tlpHub.tried = true;
-        if (!tlpHubKey()) { tlpHub.error = 'no-key'; return; }
         try {
-            const r = await tlpHubCall('myLeads');
-            if (!r.ok) { tlpHub.error = r.msg || 'The Lead Hub refused the request.'; return; }
-            tlpHub.error = ''; tlpHub.leads = r.leads || []; tlpHub.me = r.me || null; tlpHub.team = r.team || []; tlpHub.at = Date.now();
+            const r = await tlpHubCall('salesLeads', { scope: tlpIsAdmin() ? 'all' : 'mine', days: 120 });
+            if (!r.ok) { tlpHub.error = r.msg || 'The Lead Hub refused the request.'; if (!quiet) tlpRenderLeads(); return; }
+            tlpHub.error = ''; tlpHub.leads = r.leads || []; tlpHub.at = Date.now();
+            tlpHub.me = r.me ? { name: r.me.name, email: r.me.email, seeAll: !!r.me.senior || tlpIsAdmin() } : null;
+            tlpHub.team = (tlpTeamList || []).map(u => ({ name: u.full_name || u.email, email: u.email }));
         } catch (e) { tlpHub.error = 'The Lead Hub could not be reached. Check the internet and press Refresh.'; }
         if (!quiet) tlpRenderLeads();
     }
@@ -6029,13 +6028,12 @@ async function clickSyncButton() {
 
         const rows = tlpLeadsMatching();
         const cnt = document.getElementById('leads-count');
-        if (cnt) cnt.textContent = rows.length + ' of ' + all.length + ' leads' + (tlpHub.at ? '' : tlpHubKey() ? ' · Hub loading…' : '');
+        if (cnt) cnt.textContent = rows.length + ' of ' + all.length + ' leads' + (tlpHub.at || tlpHub.error ? '' : ' · Hub loading…');
         box.innerHTML = rows.length ? rows.map(tlpLeadCard).join('') : '<p class="text-xs text-slate-500 py-8 text-center col-span-full">' + (all.length ? 'No lead matches this filter.' : 'No leads yet. Scan a visiting card below, or wait for the Lead Hub to send you one.') + '</p>';
         const st = document.getElementById('lead-conn');
         if (st) {
-            st.className = 'text-[11px] mt-1 ' + (tlpHub.error && tlpHub.error !== 'no-key' ? 'text-rose-700' : 'text-slate-500');
-            st.textContent = !tlpHubKey() ? 'Lead Hub not linked to your login yet — the administrator sets this in Admin, under Team.'
-                : tlpHub.error ? tlpHub.error
+            st.className = 'text-[11px] mt-1 ' + (tlpHub.error ? 'text-rose-700' : 'text-slate-500');
+            st.textContent = tlpHub.error ? tlpHub.error
                 : tlpHub.at ? (tlpHub.me ? (tlpHub.me.seeAll ? 'Lead Hub: all team leads' : 'Lead Hub: leads for ' + tlpHub.me.name) : 'Lead Hub connected') + ' · updated ' + new Date(tlpHub.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 : 'Reading your leads from the Lead Hub…';
         }
@@ -6075,7 +6073,7 @@ async function clickSyncButton() {
             </div>
             <div class="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100">
                 <span class="text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 ${stateCol}">${tlpE(L.status)}</span>
-                ${L.hub && tlpHubManager() ? `<select onchange="tlpLeadAssign(${q(L.id)},this.value);this.selectedIndex=0" class="${TLP_IN}" style="width:auto;padding:4px 8px"><option value="">Assign to…</option>${(tlpHub.team || []).map(n => `<option>${tlpE(typeof n === 'string' ? n : (n.name || n.email))}</option>`).join('')}</select>` : ''}
+                ${L.hub && tlpHubManager() ? `<select onchange="tlpLeadAssign(${q(L.id)},this.value);this.selectedIndex=0" class="${TLP_IN}" style="width:auto;padding:4px 8px"><option value="">Assign to…</option>${(tlpHub.team || []).map(n => `<option value="${tlpE(n.email || n.name || n)}">${tlpE(n.name || n.email || n)}</option>`).join('')}</select>` : ''}
                 ${L.hub && !tlpHubManager() ? `<button type="button" class="${TLP_BTN} text-slate-500" onclick="tlpLeadDecline(${q(L.id)})">Not for me</button>` : ''}
                 ${!L.hub ? `<button type="button" class="${TLP_BTN} text-rose-600" onclick="tlpDeleteLead(${q(L.id)})">Delete</button>` : ''}
                 ${L.trail ? `<span class="text-[10px] text-slate-400 ml-auto truncate">${tlpE(L.trail)}</span>` : ''}
@@ -6097,7 +6095,7 @@ async function clickSyncButton() {
         if (hub) {
             Object.assign(row, fields);
             tlpRenderLeads();
-            try { const r = await tlpHubCall('myLeadUpdate', { id, fields }); if (!r.ok) throw new Error(r.msg || 'The Lead Hub did not save it.'); if (!quiet) showNotification('Saved', 'success'); }
+            try { const r = await tlpHubCall('salesLeadUpdate', { leadId: id, fields: fields }); if (!r.ok) throw new Error(r.msg || 'The Lead Hub did not save it.'); if (!quiet) showNotification('Saved', 'success'); }
             catch (e) { showNotification('Not saved: ' + e.message, 'error'); tlpLoadHubLeads(); }
             return;
         }
@@ -6166,12 +6164,16 @@ async function clickSyncButton() {
             showNotification(done, 'success'); await tlpLoadHubLeads(); return true;
         } catch (e) { showNotification('Could not reach the Lead Hub.', 'error'); return false; }
     }
-    function tlpLeadAssign(id, to) { if (to) tlpHubAction('assignLead', { id, to, by: currentUser && currentUser.email }, 'Given to ' + to); }
-    function tlpLeadClaim(id) { tlpHubAction('claimLead', { id, by: currentUser && currentUser.email }, 'The lead is yours'); }
+    function tlpLeadAssign(id, to) {
+        if (!to) return;
+        const m = (tlpHub.team || []).find(x => x.email === to || x.name === to);
+        tlpHubAction('assignLead', { leadId: id, toEmail: (m && m.email) || to }, 'Given to ' + ((m && m.name) || to));
+    }
+    function tlpLeadClaim(id) { tlpHubAction('claimLead', { leadId: id }, 'The lead is yours'); }
     async function tlpLeadDecline(id) {
         const why = await tlpAskOne('Why is this lead not for you?', ['Wrong region', 'Not our product', 'Duplicate', 'Already handled by someone else']);
         if (!why) return;
-        tlpHubAction('declineLead', { id, by: currentUser && currentUser.email, reason: why }, 'Sent back to the pool');
+        tlpHubAction('declineLead', { leadId: id, reason: why }, 'Sent back to the pool');
     }
 
     // When a quotation is made from a Hub lead, the Hub is told at once.
