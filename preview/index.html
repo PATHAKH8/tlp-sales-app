@@ -496,6 +496,7 @@
                     </div>
                     <div id="scan-work"></div>
                     <div id="leads-waiting"></div>
+                    <div id="lead-team" class="mb-2"></div>
                     <div id="lead-pool"></div>
                     <p class="text-sm font-bold text-slate-900">Your leads <span id="leads-count" class="text-[11px] font-semibold text-slate-500 ml-1"></span></p>
                     <div id="leads-list" class="space-y-2.5"></div>
@@ -5937,6 +5938,7 @@ async function clickSyncButton() {
     const TLP_SRC_COLOR = { IndiaMART: 'bg-orange-100 text-orange-800', Email: 'bg-sky-100 text-sky-800', JustDial: 'bg-amber-100 text-amber-800', TradeIndia: 'bg-violet-100 text-violet-800', Facebook: 'bg-blue-100 text-blue-800', 'Visiting card': 'bg-emerald-100 text-emerald-800', Note: 'bg-slate-100 text-slate-700' };
     let tlpHub = { leads: [], me: null, team: [], error: '', at: 0, tried: false };
     let tlpLeadView = { q: '', status: 'open', source: '', owner: '', quick: '', group: 'date', days: '' };
+    let tlpShowFilters = false;    // the extra filters stay out of the way until asked for
     let tlpLeadOpen = '';          // the one lead opened out in full
     let tlpGroupOpen = {};         // which day / profile blocks are folded open
     let tlpGroupMore = {};         // how many leads each block is showing
@@ -5986,12 +5988,16 @@ async function clickSyncButton() {
     }
     const tlpOverdue = L => L.followUp && L.followUp <= new Date().toLocaleDateString('en-CA') && ['Won', 'Lost'].indexOf(L.status) < 0;
     const tlpUntouched = L => L.status === 'New';
+    // A lead nobody has touched for two days is going cold, whoever it sits with.
+    const tlpQuietDays = L => { const t = Date.parse(String(L.time || '').replace(' ', 'T')); return isNaN(t) ? 0 : Math.floor((Date.now() - t) / 864e5); };
+    const tlpQuiet = L => L.status === 'New' && tlpQuietDays(L) >= 2;
 
     function tlpLeadsMatching() {
         const v = tlpLeadView, q = v.q.toLowerCase();
         return tlpAllLeads().filter(L => {
             if (v.quick === 'due' && !tlpOverdue(L)) return false;
             if (v.quick === 'new' && !tlpUntouched(L)) return false;
+            if (v.quick === 'quiet' && !tlpQuiet(L)) return false;
             if (v.quick === 'quoted' && L.status !== 'Quoted') return false;
             if (!v.quick) {
                 if (v.status === 'open' && ['Won', 'Lost'].indexOf(L.status) >= 0) return false;
@@ -6036,11 +6042,36 @@ async function clickSyncButton() {
         const box = document.getElementById('leads-list'); if (!box) return;
         const all = tlpAllLeads(), pool = tlpHub.leads.filter(l => !l.owner).map(tlpNormHub);
         // Today: what actually needs doing, as buttons that filter the list
-        const nDue = all.filter(tlpOverdue).length, nNew = all.filter(tlpUntouched).length, nQuoted = all.filter(L => L.status === 'Quoted').length;
+        const nDue = all.filter(tlpOverdue).length, nNew = all.filter(tlpUntouched).length, nQuoted = all.filter(L => L.status === 'Quoted').length, nQuiet = all.filter(tlpQuiet).length;
         const chip = (k, n, label, tone) => `<button type="button" onclick="tlpLeadQuick('${k}')" class="rounded-xl px-3 py-2 text-left ${tlpLeadView.quick === k ? tone + ' text-white' : 'bg-white border border-slate-200 text-slate-800'}"><span class="block text-lg font-extrabold leading-none">${n}</span><span class="block text-[10px] font-semibold uppercase tracking-wide mt-0.5 ${tlpLeadView.quick === k ? 'opacity-90' : 'text-slate-500'}">${label}</span></button>`;
         const today = document.getElementById('lead-today');
-        if (today) today.innerHTML = `<div class="grid grid-cols-3 gap-2">${chip('due', nDue, 'Follow-up due', 'bg-rose-600')}${chip('new', nNew, 'Not touched', 'bg-blue-600')}${chip('quoted', nQuoted, 'Quoted, waiting', 'bg-amber-600')}</div>`
+        if (today) today.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${chip('due', nDue, 'Follow-up due', 'bg-rose-600')}${chip('new', nNew, 'Not touched', 'bg-blue-600')}${chip('quiet', nQuiet, 'Gone quiet 2 days+', 'bg-orange-600')}${chip('quoted', nQuoted, 'Quoted, waiting', 'bg-amber-600')}</div>`
             + (tlpLeadView.quick ? `<p class="text-[11px] text-slate-500 mt-2">Showing one group only. <button type="button" class="font-bold text-blue-700 underline" onclick="tlpLeadQuick('')">Show all leads</button></p>` : '');
+
+        // How the team is doing — only the manager sees it, and it stays folded.
+        const teamBox = document.getElementById('lead-team');
+        if (teamBox) {
+            const people = [...new Set(tlpHub.leads.map(l => l.owner).filter(Boolean))].sort();
+            if (!tlpHubManager() || !people.length) teamBox.innerHTML = '';
+            else {
+                const n = (o, f) => tlpHub.leads.map(tlpNormHub).filter(L => L.owner === o && f(L)).length;
+                const row = o => { const mine = tlpHub.leads.map(tlpNormHub).filter(L => L.owner === o);
+                    return `<tr class="border-t border-slate-100"><td class="py-1.5 pr-2 font-semibold text-slate-800">${tlpE(o)}</td>
+                        <td class="py-1.5 pr-2 text-center">${mine.length}</td>
+                        <td class="py-1.5 pr-2 text-center ${n(o, tlpOverdue) ? 'text-rose-700 font-bold' : 'text-slate-500'}">${n(o, tlpOverdue)}</td>
+                        <td class="py-1.5 pr-2 text-center ${n(o, tlpQuiet) ? 'text-orange-700 font-bold' : 'text-slate-500'}">${n(o, tlpQuiet)}</td>
+                        <td class="py-1.5 pr-2 text-center">${n(o, L => L.status === 'Quoted')}</td>
+                        <td class="py-1.5 pr-2 text-center text-emerald-700 font-bold">${n(o, L => L.status === 'Won')}</td>
+                        <td class="py-1.5 text-center text-slate-500">${n(o, L => L.status === 'Lost')}</td></tr>`; };
+                const poolN = tlpHub.leads.filter(l => !l.owner).length;
+                teamBox.innerHTML = `<button type="button" onclick="tlpGroupOpen['__team']=!tlpGroupOpen['__team'];tlpRenderLeads()" class="w-full flex items-center gap-2 px-2.5 py-2 bg-slate-900 text-white rounded-xl text-left">
+                        <span class="text-[10px]">${tlpGroupOpen['__team'] ? '&#9650;' : '&#9660;'}</span><span class="font-extrabold text-xs">Team</span>
+                        <span class="text-[11px] opacity-80">${people.length} people · ${tlpHub.leads.length} leads${poolN ? ' · ' + poolN + ' in pool' : ''}</span></button>
+                    ${tlpGroupOpen['__team'] ? `<div class="overflow-x-auto bg-white border border-slate-200 rounded-xl mt-1.5 px-3 py-2"><table class="w-full text-[11px] text-left">
+                        <thead><tr class="text-slate-500"><th class="py-1 pr-2">Person</th><th class="py-1 pr-2 text-center">Leads</th><th class="py-1 pr-2 text-center">Due</th><th class="py-1 pr-2 text-center">Quiet</th><th class="py-1 pr-2 text-center">Quoted</th><th class="py-1 pr-2 text-center">Won</th><th class="py-1 text-center">Lost</th></tr></thead>
+                        <tbody>${people.map(row).join('')}</tbody></table></div>` : ''}`;
+            }
+        }
 
         // Pool: leads nobody owns yet, first to grab keeps them
         const poolBox = document.getElementById('lead-pool');
@@ -6053,12 +6084,19 @@ async function clickSyncButton() {
         const ownList = [...new Set(tlpHub.leads.map(l => l.owner || 'Unassigned'))].sort();
         const sel = (id, cur, items, blank) => `<select id="${id}" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white"><option value="">${blank}</option>${items.map(x => `<option ${x === cur ? 'selected' : ''}>${tlpE(x)}</option>`).join('')}</select>`;
         const fbox = document.getElementById('lead-filters');
-        if (fbox) fbox.innerHTML = `<input id="lead-q" type="search" value="${tlpE(tlpLeadView.q)}" placeholder="Search name, company, product, phone" oninput="tlpLeadFilter()" class="flex-1 min-w-[170px] border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white">
-            <select id="lead-status" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white"><option value="open" ${tlpLeadView.status === 'open' ? 'selected' : ''}>Open leads</option>${TLP_LEAD_STATES.map(s => `<option ${s === tlpLeadView.status ? 'selected' : ''}>${s}</option>`).join('')}<option value="all" ${tlpLeadView.status === 'all' ? 'selected' : ''}>All</option></select>
-            ${sel('lead-source', tlpLeadView.source, srcList, 'Every source')}
-            ${tlpHubManager() && ownList.length > 1 ? sel('lead-owner', tlpLeadView.owner, ownList, 'Everyone') : ''}
-            <select id="lead-days" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white">${[['', 'Any date'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['90', 'Last 3 months']].map(([k, label]) => `<option value="${k}" ${k === tlpLeadView.days ? 'selected' : ''}>${label}</option>`).join('')}</select>
-            <select id="lead-group" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white">${TLP_GROUPS.map(([k, label]) => `<option value="${k}" ${k === tlpLeadView.group ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
+        const extra = (tlpLeadView.status !== 'open' ? 1 : 0) + (tlpLeadView.source ? 1 : 0) + (tlpLeadView.owner ? 1 : 0) + (tlpLeadView.days ? 1 : 0);
+        if (fbox) fbox.innerHTML = `<div class="flex gap-2 w-full">
+                <input id="lead-q" type="search" value="${tlpE(tlpLeadView.q)}" placeholder="Search name, company, product, phone" oninput="tlpLeadFilter()" class="flex-1 min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white">
+                <select id="lead-group" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white shrink-0">${TLP_GROUPS.map(([k, label]) => `<option value="${k}" ${k === tlpLeadView.group ? 'selected' : ''}>${label}</option>`).join('')}</select>
+                <button type="button" onclick="tlpShowFilters=!tlpShowFilters;tlpRenderLeads()" class="${TLP_BTN} shrink-0 ${extra ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}">Filters${extra ? ' (' + extra + ')' : ''}</button>
+            </div>
+            ${tlpShowFilters || extra ? `<div class="flex flex-wrap gap-2 w-full">
+                <select id="lead-status" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white"><option value="open" ${tlpLeadView.status === 'open' ? 'selected' : ''}>Open leads</option>${TLP_LEAD_STATES.map(s => `<option ${s === tlpLeadView.status ? 'selected' : ''}>${s}</option>`).join('')}<option value="all" ${tlpLeadView.status === 'all' ? 'selected' : ''}>All</option></select>
+                ${sel('lead-source', tlpLeadView.source, srcList, 'Every source')}
+                ${tlpHubManager() && ownList.length > 1 ? sel('lead-owner', tlpLeadView.owner, ownList, 'Everyone') : ''}
+                <select id="lead-days" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white">${[['', 'Any date'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['90', 'Last 3 months']].map(([k, label]) => `<option value="${k}" ${k === tlpLeadView.days ? 'selected' : ''}>${label}</option>`).join('')}</select>
+                ${extra ? `<button type="button" onclick="tlpClearLeadFilters()" class="${TLP_BTN} text-slate-600 underline">Clear</button>` : ''}
+            </div>` : ''}`;
 
         const rows = tlpLeadsMatching();
         const cnt = document.getElementById('leads-count');
@@ -6098,7 +6136,44 @@ async function clickSyncButton() {
     // One line per lead, so a few hundred of them can be read at a glance. Tapping a line
     // opens that one out in full, with the buttons and the notes.
     const tlpKey = L => (L.hub ? 'H' : 'S') + L.id;
-    function tlpToggleLead(id, hub) { const k = (hub ? 'H' : 'S') + id; tlpLeadOpen = tlpLeadOpen === k ? '' : k; tlpRenderLeads(); }
+    function tlpToggleLead(id, hub) {
+        const k = (hub ? 'H' : 'S') + id;
+        tlpLeadOpen = tlpLeadOpen === k ? '' : k;
+        tlpRenderLeads();
+        if (tlpLeadOpen === k) tlpLeadStock(id, hub);
+    }
+    // What is on the floor right now, read from the stock app. Quiet if that app is not linked.
+    const TLP_STOCK_JS = 'https://pathakh8.github.io/tlp-sales-app/stock/stock-widget.js';
+    const TLP_STOCK_API = 'https://script.google.com/macros/s/AKfycbyYnEF03YO6beoUc73BANsgKUXOzqPwR-DJqR4yIAqCwFWGyKqEtzObx73v5XJp1uXD/exec';
+    let tlpStockReady = null, tlpStockSeen = {};
+    function tlpLoadStock() {
+        if (tlpStockReady) return tlpStockReady;
+        tlpStockReady = new Promise((ok, no) => {
+            if (window.TLPStock) return ok(window.TLPStock);
+            const el = document.createElement('script');
+            el.src = TLP_STOCK_JS; el.onload = () => ok(window.TLPStock); el.onerror = () => no(new Error('no stock app'));
+            document.head.appendChild(el);
+        }).then(S => { if (S && S.config) S.config({ api: TLP_STOCK_API, appUrl: 'https://pathakh8.github.io/tlp-sales-app/stock/' }); return S; });
+        return tlpStockReady;
+    }
+    async function tlpLeadStock(id, hub) {
+        const L = (hub ? tlpHub.leads.map(tlpNormHub) : (tlpLeads || []).map(tlpNormScan)).find(x => String(x.id) === String(id));
+        if (!L) return;
+        const box = () => document.getElementById('stk-' + tlpKey(L));
+        const q = String(L.product || '').replace(/\b(machine|urgently|required|requirement|price|quotation)\b/gi, '').trim();
+        if (!q) return;
+        if (tlpStockSeen[q] !== undefined) { const b = box(); if (b) b.innerHTML = tlpStockSeen[q]; return; }
+        const b0 = box(); if (b0) b0.textContent = 'Checking stock…';
+        try {
+            const S = await tlpLoadStock();
+            const a = await S.availability(q);
+            const html = a && a.total
+                ? '<span class="text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1 inline-block">In stock: ' + tlpE(a.text) + (a.free !== undefined ? ' · ' + a.free + ' free' : '') + '</span>'
+                : '<span class="text-slate-500">Not in stock right now</span>';
+            tlpStockSeen[q] = html;
+        } catch (e) { tlpStockSeen[q] = ''; }
+        const b = box(); if (b) b.innerHTML = tlpStockSeen[q];
+    }
     function tlpToggleGroup(label) { tlpGroupOpen[label] = !tlpGroupOpen[label]; tlpRenderLeads(); }
     function tlpGroupMoreShow(label) { tlpGroupMore[label] = (tlpGroupMore[label] || TLP_PAGE) + TLP_PAGE; tlpRenderLeads(); }
     const TLP_PAGE = 20;
@@ -6115,6 +6190,7 @@ async function clickSyncButton() {
                 </span>
                 ${L.hub ? `<span class="shrink-0 text-[9px] font-bold rounded-full px-2 py-0.5 ${L.owner ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'}">${L.owner ? tlpE(L.owner) : 'Pool'}</span>` : ''}
                 ${tlpOverdue(L) ? '<span class="shrink-0 text-[9px] font-black uppercase rounded-full px-1.5 py-0.5 bg-rose-600 text-white">Due</span>' : ''}
+                ${tlpQuiet(L) ? `<span class="shrink-0 text-[9px] font-black uppercase rounded-full px-1.5 py-0.5 bg-orange-100 text-orange-800">Quiet ${tlpQuietDays(L)}d</span>` : ''}
                 <span class="shrink-0 text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 ${stateCol}">${tlpE(L.status)}</span>
                 <span class="shrink-0 text-slate-400 text-[10px]">${open ? '&#9650;' : '&#9660;'}</span>
             </button>
@@ -6132,6 +6208,7 @@ async function clickSyncButton() {
                 <span class="text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 ml-1 ${TLP_SRC_COLOR[L.source] || 'bg-slate-100 text-slate-700'}">${tlpE(L.source)}</span></p>
             ${L.hub ? `<p class="text-[11px] ${L.owner ? 'text-slate-700' : 'text-amber-800'}">${L.owner ? 'With <b>' + tlpE(L.owner) + '</b>' : 'In the pool — nobody has taken this yet'}${L.followUp ? ' · follow up ' + tlpE(L.followUp) : ''}</p>` : ''}
             ${client ? `<p class="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1">Already your client: ${tlpE(client.name)}${client.city ? ', ' + tlpE(client.city) : ''}</p>` : ''}
+            <p id="stk-${tlpE(tlpKey(L))}" class="text-[11px] text-slate-500"></p>
             ${L.message ? `<p class="text-slate-600 bg-slate-50 rounded-lg p-2" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${tlpE(L.message)}</p>` : ''}
             ${L.quoteNo ? `<p class="text-[11px] text-blue-800">Quotation ${tlpE(L.quoteNo)} made</p>` : ''}
             <div class="grid grid-cols-2 gap-2">
@@ -6162,6 +6239,7 @@ async function clickSyncButton() {
         tlpRenderLeads();
         const el = document.getElementById('lead-q'); if (el && tlpLeadView.q) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }
+    function tlpClearLeadFilters() { tlpLeadView = Object.assign(tlpLeadView, { status: 'open', source: '', owner: '', days: '' }); tlpRenderLeads(); }
     function tlpLeadQuick(k) { tlpLeadView.quick = tlpLeadView.quick === k ? '' : k; tlpRenderLeads(); }
     const tlpFindLead = (id, hub) => (hub ? tlpHub.leads.find(l => String(l.id) === String(id)) : (tlpLeads || []).find(l => String(l.id) === String(id)));
 
