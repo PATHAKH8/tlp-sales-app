@@ -6111,8 +6111,9 @@ async function clickSyncButton() {
                 <span class="${tier} text-white text-[11px] font-extrabold rounded-lg w-7 h-7 flex items-center justify-center shrink-0">${L.score === '' || L.score === undefined ? '·' : tlpE(L.score)}</span>
                 <span class="min-w-0 flex-1">
                     <span class="block font-bold text-[12px] text-slate-900 truncate">${tlpE(L.product)}</span>
-                    <span class="block text-[10px] text-slate-500 truncate">${tlpE([L.name || L.company, L.city, String(L.time).slice(11, 16)].filter(Boolean).join(' · '))}${tlpHubManager() && L.hub ? ' · ' + tlpE(L.owner || 'nobody') : ''}</span>
+                    <span class="block text-[10px] text-slate-500 truncate">${tlpE([L.name || L.company, L.city, String(L.time).slice(11, 16)].filter(Boolean).join(' · '))}</span>
                 </span>
+                ${L.hub ? `<span class="shrink-0 text-[9px] font-bold rounded-full px-2 py-0.5 ${L.owner ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'}">${L.owner ? tlpE(L.owner) : 'Pool'}</span>` : ''}
                 ${tlpOverdue(L) ? '<span class="shrink-0 text-[9px] font-black uppercase rounded-full px-1.5 py-0.5 bg-rose-600 text-white">Due</span>' : ''}
                 <span class="shrink-0 text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 ${stateCol}">${tlpE(L.status)}</span>
                 <span class="shrink-0 text-slate-400 text-[10px]">${open ? '&#9650;' : '&#9660;'}</span>
@@ -6129,6 +6130,7 @@ async function clickSyncButton() {
         return `<div class="bg-white border ${tlpOverdue(L) ? 'border-rose-300' : 'border-slate-200'} border-t-0 rounded-b-xl p-3 text-xs space-y-2">
             <p class="text-[10px] text-slate-500">${tlpE([L.name, L.company, L.city, L.time].filter(Boolean).join(' · '))}
                 <span class="text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 ml-1 ${TLP_SRC_COLOR[L.source] || 'bg-slate-100 text-slate-700'}">${tlpE(L.source)}</span></p>
+            ${L.hub ? `<p class="text-[11px] ${L.owner ? 'text-slate-700' : 'text-amber-800'}">${L.owner ? 'With <b>' + tlpE(L.owner) + '</b>' : 'In the pool — nobody has taken this yet'}${L.followUp ? ' · follow up ' + tlpE(L.followUp) : ''}</p>` : ''}
             ${client ? `<p class="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1">Already your client: ${tlpE(client.name)}${client.city ? ', ' + tlpE(client.city) : ''}</p>` : ''}
             ${L.message ? `<p class="text-slate-600 bg-slate-50 rounded-lg p-2" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${tlpE(L.message)}</p>` : ''}
             ${L.quoteNo ? `<p class="text-[11px] text-blue-800">Quotation ${tlpE(L.quoteNo)} made</p>` : ''}
