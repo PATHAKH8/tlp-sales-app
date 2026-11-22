@@ -500,6 +500,7 @@
                     <div id="lead-report" class="mb-2"></div>
                     <div id="lead-pool"></div>
                     <p class="text-sm font-bold text-slate-900">Your leads <span id="leads-count" class="text-[11px] font-semibold text-slate-500 ml-1"></span></p>
+                    <div id="lead-pick" class="mb-2"></div>
                     <div id="leads-list" class="space-y-2.5"></div>
                 </section>
 
@@ -5938,11 +5939,12 @@ async function clickSyncButton() {
     const TLP_LOST_REASONS = ['Price too high', 'Bought elsewhere', 'Not buying now', 'No response', 'Wrong enquiry'];
     const TLP_SRC_COLOR = { IndiaMART: 'bg-orange-100 text-orange-800', Email: 'bg-sky-100 text-sky-800', JustDial: 'bg-amber-100 text-amber-800', TradeIndia: 'bg-violet-100 text-violet-800', Facebook: 'bg-blue-100 text-blue-800', 'Visiting card': 'bg-emerald-100 text-emerald-800', Note: 'bg-slate-100 text-slate-700' };
     let tlpHub = { leads: [], me: null, team: [], error: '', at: 0, tried: false };
-    let tlpLeadView = { q: '', status: 'open', source: '', owner: '', quick: '', group: 'date', days: '' };
+    let tlpLeadView = { q: '', status: 'open', source: '', owner: '', quick: '', group: 'date', days: '', state: '' };
     let tlpShowFilters = false;    // the extra filters stay out of the way until asked for
     const tlpViewKey = () => 'tlp_leadview_' + ((currentUser && currentUser.email) || 'x');
-    function tlpSaveView() { try { localStorage.setItem(tlpViewKey(), JSON.stringify({ status: tlpLeadView.status, source: tlpLeadView.source, owner: tlpLeadView.owner, days: tlpLeadView.days, group: tlpLeadView.group })); } catch (e) {} }
+    function tlpSaveView() { try { localStorage.setItem(tlpViewKey(), JSON.stringify({ status: tlpLeadView.status, source: tlpLeadView.source, owner: tlpLeadView.owner, days: tlpLeadView.days, group: tlpLeadView.group, state: tlpLeadView.state })); } catch (e) {} }
     function tlpLoadView() { try { const v = JSON.parse(localStorage.getItem(tlpViewKey()) || '{}'); Object.keys(v).forEach(k => { if (v[k] !== undefined) tlpLeadView[k] = v[k]; }); } catch (e) {} }
+    let tlpPicked = {};            // leads ticked for handing out in one go
     let tlpLeadOpen = '';          // the one lead opened out in full
     let tlpGroupOpen = {};         // which day / profile blocks are folded open
     let tlpGroupMore = {};         // how many leads each block is showing
@@ -5971,13 +5973,13 @@ async function clickSyncButton() {
     // Hub leads and scanned cards are shown side by side, so one shape is used for both.
     const tlpDigits = v => String(v || '').replace(/\D/g, '');
     function tlpNormHub(l) {
-        return { id: String(l.id), hub: true, source: l.source || 'IndiaMART', name: l.name || '', company: l.company || '', city: [l.city, l.state].filter(Boolean).join(', '),
+        return { id: String(l.id), hub: true, source: l.source || 'IndiaMART', name: l.name || '', company: l.company || '', city: [l.city, l.state].filter(Boolean).join(', '), state: l.state || '',
             product: l.product || 'Enquiry', score: l.score, tier: l.tier || '', message: l.message || '', time: String(l.time || '').slice(0, 16),
             status: l.status || 'New', followUp: l.followUp || '', notes: l.notes || '', owner: l.owner || '', phone: l.mobile || l.phone || '', email: l.email || '',
             quoteNo: l.quoteNo || '', trail: l.lastAction || '', account: l.account || '', raw: l };
     }
     function tlpNormScan(l) {
-        return { id: String(l.id), hub: false, source: l.kind === 'note' ? 'Note' : 'Visiting card', name: l.name || '', company: l.company || '', city: l.address || '',
+        return { id: String(l.id), hub: false, source: l.kind === 'note' ? 'Note' : 'Visiting card', name: l.name || '', company: l.company || '', city: l.address || '', state: l.state_code || '',
             product: l.items_text ? String(l.items_text).split('\n')[0].split('|')[0].trim() : (l.requirement ? String(l.requirement).slice(0, 60) : 'Enquiry'), score: '', tier: '',
             message: l.requirement || '', time: String(l.created_at || '').slice(0, 16).replace('T', ' '), status: l.status === 'Quoted' ? 'Quoted' : (l.status || 'New'),
             followUp: l.follow_up || '', notes: l.notes || '', owner: l.created_by_name || '', phone: l.phone || '', email: l.email || '', quoteNo: l.quote_no || '',
@@ -6009,6 +6011,7 @@ async function clickSyncButton() {
             }
             if (v.days && String(L.time).slice(0, 10) < new Date(Date.now() - Number(v.days) * 864e5).toLocaleDateString('en-CA')) return false;
             if (v.source && L.source !== v.source) return false;
+            if (v.state && L.state !== v.state) return false;
             if (v.owner && (L.owner || 'Unassigned') !== v.owner) return false;
             return !q || [L.name, L.company, L.product, L.city, L.phone, L.email, L.message, L.notes].join(' ').toLowerCase().includes(q);
         }).sort((a, b) => (tlpOverdue(b) - tlpOverdue(a)) || String(b.time).localeCompare(String(a.time)));
@@ -6016,7 +6019,7 @@ async function clickSyncButton() {
 
     // Leads read better in blocks than as one long list: by the day they came in, or by the
     // IndiaMART profile they came through, which is also the company that will quote them.
-    const TLP_GROUPS = [['date', 'By date'], ['account', 'By IndiaMART profile'], ['owner', 'By person'], ['', 'One long list']];
+    const TLP_GROUPS = [['date', 'By date'], ['account', 'By IndiaMART profile'], ['state', 'By state'], ['owner', 'By person'], ['', 'One long list']];
     function tlpDayLabel(t) {
         const d = String(t || '').slice(0, 10); if (!d) return 'No date';
         const today = new Date(), day = ms => new Date(today.getTime() - ms * 86400000).toLocaleDateString('en-CA');
@@ -6027,6 +6030,7 @@ async function clickSyncButton() {
     function tlpGroupOf(L) {
         if (tlpLeadView.group === 'date') return tlpDayLabel(L.time);
         if (tlpLeadView.group === 'account') return L.hub ? (L.account || L.source || 'Other enquiries') : 'Scanned here';
+        if (tlpLeadView.group === 'state') return L.state || 'State not given';
         if (tlpLeadView.group === 'owner') return L.owner || 'Not given to anyone yet';
         return '';
     }
@@ -6087,10 +6091,11 @@ async function clickSyncButton() {
 
         // Filters
         const srcList = [...new Set(all.map(L => L.source))].sort();
+        const stateList = [...new Set(all.map(L => L.state).filter(Boolean))].sort();
         const ownList = [...new Set(tlpHub.leads.map(l => l.owner || 'Unassigned'))].sort();
         const sel = (id, cur, items, blank) => `<select id="${id}" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white"><option value="">${blank}</option>${items.map(x => `<option ${x === cur ? 'selected' : ''}>${tlpE(x)}</option>`).join('')}</select>`;
         const fbox = document.getElementById('lead-filters');
-        const extra = (tlpLeadView.status !== 'open' ? 1 : 0) + (tlpLeadView.source ? 1 : 0) + (tlpLeadView.owner ? 1 : 0) + (tlpLeadView.days ? 1 : 0);
+        const extra = (tlpLeadView.status !== 'open' ? 1 : 0) + (tlpLeadView.source ? 1 : 0) + (tlpLeadView.owner ? 1 : 0) + (tlpLeadView.days ? 1 : 0) + (tlpLeadView.state ? 1 : 0);
         if (fbox) fbox.innerHTML = `<div class="flex gap-2 w-full">
                 <input id="lead-q" type="search" value="${tlpE(tlpLeadView.q)}" placeholder="Search name, company, product, phone" oninput="tlpLeadFilter()" class="flex-1 min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white">
                 <select id="lead-group" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white shrink-0">${TLP_GROUPS.map(([k, label]) => `<option value="${k}" ${k === tlpLeadView.group ? 'selected' : ''}>${label}</option>`).join('')}</select>
@@ -6099,11 +6104,13 @@ async function clickSyncButton() {
             ${tlpShowFilters || extra ? `<div class="flex flex-wrap gap-2 w-full">
                 <select id="lead-status" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white"><option value="open" ${tlpLeadView.status === 'open' ? 'selected' : ''}>Open leads</option>${TLP_LEAD_STATES.map(s => `<option ${s === tlpLeadView.status ? 'selected' : ''}>${s}</option>`).join('')}<option value="all" ${tlpLeadView.status === 'all' ? 'selected' : ''}>All</option></select>
                 ${sel('lead-source', tlpLeadView.source, srcList, 'Every source')}
+                ${stateList.length ? sel('lead-state', tlpLeadView.state, stateList, 'Every state') : ''}
                 ${tlpHubManager() && ownList.length > 1 ? sel('lead-owner', tlpLeadView.owner, ownList, 'Everyone') : ''}
                 <select id="lead-days" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white">${[['', 'Any date'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['90', 'Last 3 months']].map(([k, label]) => `<option value="${k}" ${k === tlpLeadView.days ? 'selected' : ''}>${label}</option>`).join('')}</select>
                 ${extra ? `<button type="button" onclick="tlpClearLeadFilters()" class="${TLP_BTN} text-slate-600 underline">Clear</button>` : ''}
             </div>` : ''}`;
 
+        tlpRenderPickBar();
         const rows = tlpLeadsMatching();
         const cnt = document.getElementById('leads-count');
         if (cnt) cnt.textContent = rows.length + ' of ' + all.length + ' leads' + (tlpHub.at || tlpHub.error ? '' : ' · Hub loading…');
@@ -6182,6 +6189,50 @@ async function clickSyncButton() {
         } catch (e) { tlpStockSeen[q] = ''; }
         const b = box(); if (b) b.innerHTML = tlpStockSeen[q];
     }
+    function tlpPick(id, on) { const k = 'H' + id; if (on) tlpPicked[k] = true; else delete tlpPicked[k]; tlpRenderPickBar(); }
+    function tlpPickClear() { tlpPicked = {}; tlpRenderLeads(); }
+    function tlpPickAllShown() { tlpLeadsMatching().forEach(L => { if (L.hub) tlpPicked[tlpKey(L)] = true; }); tlpRenderLeads(); }
+    function tlpRenderPickBar() {
+        const bar = document.getElementById('lead-pick'); if (!bar) return;
+        const n = Object.keys(tlpPicked).length;
+        bar.innerHTML = n ? `<div class="sticky top-0 z-20 flex items-center gap-2 flex-wrap bg-blue-700 text-white rounded-xl px-3 py-2 text-xs">
+                <b>${n} lead${n > 1 ? 's' : ''} ticked</b>
+                <button type="button" class="${TLP_BTN} bg-white text-blue-800 font-bold" onclick="tlpAssignPicked()">Give to…</button>
+                <button type="button" class="${TLP_BTN} bg-blue-600 text-white" onclick="tlpPickAllShown()">Tick all shown</button>
+                <button type="button" class="${TLP_BTN} text-white underline ml-auto" onclick="tlpPickClear()">Clear</button>
+            </div>` : '';
+    }
+    // Several people can be chosen: the leads are then dealt out between them, one each in turn.
+    function tlpPickPeople() {
+        const team = (tlpHub.team || []).filter(t => t.email || t.name);
+        return new Promise(resolve => {
+            const m = document.createElement('div');
+            m.className = 'fixed inset-0 z-[80] bg-black/50 flex items-end sm:items-center justify-center p-3';
+            m.innerHTML = `<div class="bg-white rounded-2xl w-full max-w-sm p-4 space-y-2">
+                <p class="font-bold text-sm text-slate-900">Give these leads to</p>
+                <p class="text-[11px] text-slate-500">Tick more than one and they will be shared out evenly.</p>
+                <div class="space-y-1 max-h-64 overflow-y-auto">${team.map((t, i) => `<label class="flex items-center gap-2 text-xs bg-slate-50 rounded-lg px-2 py-2"><input type="checkbox" data-em="${tlpE(t.email || t.name)}"> ${tlpE(t.name || t.email)}</label>`).join('')}</div>
+                <div class="flex gap-2 pt-1"><button type="button" class="${TLP_BTN} bg-blue-600 text-white flex-1" data-go>Give</button>
+                <button type="button" class="${TLP_BTN} bg-white border border-slate-300 text-slate-700" data-no>Cancel</button></div></div>`;
+            document.body.appendChild(m);
+            const done = v => { m.remove(); resolve(v); };
+            m.querySelector('[data-no]').onclick = () => done(null);
+            m.onclick = e => { if (e.target === m) done(null); };
+            m.querySelector('[data-go]').onclick = () => done([...m.querySelectorAll('input[data-em]:checked')].map(x => x.dataset.em));
+        });
+    }
+    async function tlpAssignPicked() {
+        const ids = Object.keys(tlpPicked).map(k => k.slice(1)); if (!ids.length) return;
+        const people = await tlpPickPeople(); if (!people || !people.length) return;
+        let ok = 0, fail = 0;
+        for (let i = 0; i < ids.length; i++) {
+            const to = people[i % people.length];
+            try { const r = await tlpHubCall('assignLead', { leadId: ids[i], toEmail: to }); r.ok ? ok++ : fail++; } catch (e) { fail++; }
+        }
+        tlpPicked = {};
+        showNotification(ok + ' lead' + (ok === 1 ? '' : 's') + ' given out' + (fail ? ', ' + fail + ' could not be' : ''), fail ? 'error' : 'success');
+        await tlpLoadHubLeads();
+    }
     function tlpToggleGroup(label) { tlpGroupOpen[label] = !tlpGroupOpen[label]; tlpRenderLeads(); }
     function tlpGroupMoreShow(label) { tlpGroupMore[label] = (tlpGroupMore[label] || TLP_PAGE) + TLP_PAGE; tlpRenderLeads(); }
     const TLP_PAGE = 20;
@@ -6190,7 +6241,9 @@ async function clickSyncButton() {
         const tier = { Hot: 'bg-rose-600', Warm: 'bg-amber-500', Cold: 'bg-blue-500', Junk: 'bg-slate-400' }[L.tier] || 'bg-slate-500';
         const stateCol = { New: 'bg-blue-100 text-blue-800', Quoted: 'bg-amber-100 text-amber-800', Won: 'bg-emerald-100 text-emerald-800', Lost: 'bg-slate-200 text-slate-600' }[L.status] || 'bg-slate-100 text-slate-700';
         return `<div>
-            <button type="button" onclick="tlpToggleLead(${q(L.id)},${L.hub})" class="w-full text-left flex items-center gap-2.5 px-2.5 py-2 bg-white border ${tlpOverdue(L) ? 'border-rose-300' : 'border-slate-200'} ${open ? 'rounded-t-xl border-b-0' : 'rounded-xl'}">
+            <div class="flex items-center gap-1.5">
+            ${L.hub && tlpHubManager() ? `<label class="shrink-0 pl-0.5" onclick="event.stopPropagation()"><input type="checkbox" ${tlpPicked[tlpKey(L)] ? 'checked' : ''} onchange="tlpPick(${q(L.id)},this.checked)"></label>` : ''}
+            <button type="button" onclick="tlpToggleLead(${q(L.id)},${L.hub})" class="flex-1 min-w-0 text-left flex items-center gap-2.5 px-2.5 py-2 bg-white border ${tlpOverdue(L) ? 'border-rose-300' : 'border-slate-200'} ${open ? 'rounded-t-xl border-b-0' : 'rounded-xl'}">
                 <span class="${tier} text-white text-[11px] font-extrabold rounded-lg w-7 h-7 flex items-center justify-center shrink-0">${L.score === '' || L.score === undefined ? '·' : tlpE(L.score)}</span>
                 <span class="min-w-0 flex-1">
                     <span class="block font-bold text-[12px] text-slate-900 truncate">${tlpE(L.product)}</span>
@@ -6205,7 +6258,8 @@ async function clickSyncButton() {
                 <span class="shrink-0 text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 ${stateCol}">${tlpE(L.status)}</span>
                 <span class="shrink-0 text-slate-400 text-[10px]">${open ? '&#9650;' : '&#9660;'}</span>
             </button>
-            ${open ? tlpLeadCard(L) : ''}</div>`;
+            </div>
+            ${open ? `<div class="${L.hub && tlpHubManager() ? 'pl-[22px]' : ''}">${tlpLeadCard(L)}</div>` : ''}</div>`;
     }
 
     // ---------- The day's report, one block per salesperson, ready to send ----------
@@ -6326,12 +6380,12 @@ async function clickSyncButton() {
     function tlpLeadFilter() {
         const g = id => (document.getElementById(id) || {}).value || '';
         const grp = document.getElementById('lead-group');
-        tlpLeadView = { q: g('lead-q'), status: g('lead-status') || 'open', source: g('lead-source'), owner: g('lead-owner'), quick: tlpLeadView.quick, group: grp ? grp.value : tlpLeadView.group, days: g('lead-days') };
+        tlpLeadView = { q: g('lead-q'), status: g('lead-status') || 'open', source: g('lead-source'), owner: g('lead-owner'), quick: tlpLeadView.quick, group: grp ? grp.value : tlpLeadView.group, days: g('lead-days'), state: g('lead-state') };
         tlpSaveView();
         tlpRenderLeads();
         const el = document.getElementById('lead-q'); if (el && tlpLeadView.q) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }
-    function tlpClearLeadFilters() { tlpLeadView = Object.assign(tlpLeadView, { status: 'open', source: '', owner: '', days: '' }); tlpRenderLeads(); }
+    function tlpClearLeadFilters() { tlpLeadView = Object.assign(tlpLeadView, { status: 'open', source: '', owner: '', days: '', state: '' }); tlpSaveView(); tlpRenderLeads(); }
     function tlpLeadQuick(k) { tlpLeadView.quick = tlpLeadView.quick === k ? '' : k; tlpRenderLeads(); }
     const tlpFindLead = (id, hub) => (hub ? tlpHub.leads.find(l => String(l.id) === String(id)) : (tlpLeads || []).find(l => String(l.id) === String(id)));
 
