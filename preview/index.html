@@ -497,6 +497,7 @@
                     <div id="scan-work"></div>
                     <div id="leads-waiting"></div>
                     <div id="lead-team" class="mb-2"></div>
+                    <div id="lead-report" class="mb-2"></div>
                     <div id="lead-pool"></div>
                     <p class="text-sm font-bold text-slate-900">Your leads <span id="leads-count" class="text-[11px] font-semibold text-slate-500 ml-1"></span></p>
                     <div id="leads-list" class="space-y-2.5"></div>
@@ -5939,6 +5940,9 @@ async function clickSyncButton() {
     let tlpHub = { leads: [], me: null, team: [], error: '', at: 0, tried: false };
     let tlpLeadView = { q: '', status: 'open', source: '', owner: '', quick: '', group: 'date', days: '' };
     let tlpShowFilters = false;    // the extra filters stay out of the way until asked for
+    const tlpViewKey = () => 'tlp_leadview_' + ((currentUser && currentUser.email) || 'x');
+    function tlpSaveView() { try { localStorage.setItem(tlpViewKey(), JSON.stringify({ status: tlpLeadView.status, source: tlpLeadView.source, owner: tlpLeadView.owner, days: tlpLeadView.days, group: tlpLeadView.group })); } catch (e) {} }
+    function tlpLoadView() { try { const v = JSON.parse(localStorage.getItem(tlpViewKey()) || '{}'); Object.keys(v).forEach(k => { if (v[k] !== undefined) tlpLeadView[k] = v[k]; }); } catch (e) {} }
     let tlpLeadOpen = '';          // the one lead opened out in full
     let tlpGroupOpen = {};         // which day / profile blocks are folded open
     let tlpGroupMore = {};         // how many leads each block is showing
@@ -6073,6 +6077,8 @@ async function clickSyncButton() {
             }
         }
 
+        tlpRenderReport();
+
         // Pool: leads nobody owns yet, first to grab keeps them
         const poolBox = document.getElementById('lead-pool');
         if (poolBox) poolBox.innerHTML = pool.length ? `<div class="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
@@ -6136,6 +6142,8 @@ async function clickSyncButton() {
     // One line per lead, so a few hundred of them can be read at a glance. Tapping a line
     // opens that one out in full, with the buttons and the notes.
     const tlpKey = L => (L.hub ? 'H' : 'S') + L.id;
+    const tlpWaNo = L => { const d = tlpDigits(L.phone); return d.length === 10 ? '91' + d : (d.length > 10 ? d : ''); };
+    const tlpHello = L => encodeURIComponent('Dear ' + (L.name || 'Sir') + ', this is ' + ((currentUser && currentUser.name) || 'TL Pathak Group') + ' from TL Pathak Group, regarding your enquiry for ' + (L.product || 'machines') + '.');
     function tlpToggleLead(id, hub) {
         const k = (hub ? 'H' : 'S') + id;
         tlpLeadOpen = tlpLeadOpen === k ? '' : k;
@@ -6189,12 +6197,89 @@ async function clickSyncButton() {
                     <span class="block text-[10px] text-slate-500 truncate">${tlpE([L.name || L.company, L.city, String(L.time).slice(11, 16)].filter(Boolean).join(' · '))}</span>
                 </span>
                 ${L.hub ? `<span class="shrink-0 text-[9px] font-bold rounded-full px-2 py-0.5 ${L.owner ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'}">${L.owner ? tlpE(L.owner) : 'Pool'}</span>` : ''}
+                ${tlpWaNo(L) ? `<span class="shrink-0 flex gap-1" onclick="event.stopPropagation()">
+                    <a href="tel:+${tlpWaNo(L)}" class="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[11px]" title="Call">&#9742;</a>
+                    <a target="_blank" rel="noopener" href="https://wa.me/${tlpWaNo(L)}?text=${tlpHello(L)}" class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[11px] font-bold" title="WhatsApp">W</a></span>` : ''}
                 ${tlpOverdue(L) ? '<span class="shrink-0 text-[9px] font-black uppercase rounded-full px-1.5 py-0.5 bg-rose-600 text-white">Due</span>' : ''}
                 ${tlpQuiet(L) ? `<span class="shrink-0 text-[9px] font-black uppercase rounded-full px-1.5 py-0.5 bg-orange-100 text-orange-800">Quiet ${tlpQuietDays(L)}d</span>` : ''}
                 <span class="shrink-0 text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 ${stateCol}">${tlpE(L.status)}</span>
                 <span class="shrink-0 text-slate-400 text-[10px]">${open ? '&#9650;' : '&#9660;'}</span>
             </button>
             ${open ? tlpLeadCard(L) : ''}</div>`;
+    }
+
+    // ---------- The day's report, one block per salesperson, ready to send ----------
+    let tlpReportDay = '';
+    function tlpReportSet(d) { tlpReportDay = d; tlpRenderReport(); }
+    function tlpReportRows(day) {
+        const hub = tlpHub.leads.map(tlpNormHub), today = new Date().toLocaleDateString('en-CA');
+        const dayLeads = hub.filter(L => String(L.time).slice(0, 10) === day);
+        const names = [...new Set(hub.map(L => L.owner).filter(Boolean))].sort();
+        const who = tlpHubManager() ? names : [(tlpHub.me && tlpHub.me.name) || ''].filter(Boolean);
+        return who.map(o => {
+            const got = dayLeads.filter(L => L.owner === o), mine = hub.filter(L => L.owner === o);
+            const n = (list, f) => list.filter(f).length;
+            return { who: o, got: got.length, untouched: n(got, tlpUntouched),
+                open: n(mine, L => ['Won', 'Lost'].indexOf(L.status) < 0),
+                due: n(mine, tlpOverdue), quiet: n(mine, tlpQuiet),
+                quoted: n(mine, L => L.status === 'Quoted'), won: n(mine, L => L.status === 'Won'), lost: n(mine, L => L.status === 'Lost') };
+        }).filter(r => r.got || r.open || r.won);
+    }
+    function tlpReportText(day, rows) {
+        const nice = new Date(day + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        const pool = tlpHub.leads.filter(l => !l.owner).length;
+        return 'TL Pathak Group - Lead report ' + nice + '\n\n'
+            + rows.map(r => r.who + '\n  New today: ' + r.got + (r.untouched ? ' (' + r.untouched + ' not touched)' : '')
+                + '\n  Open: ' + r.open + ' | Follow-up due: ' + r.due + ' | Quiet: ' + r.quiet
+                + '\n  Quoted: ' + r.quoted + ' | Won: ' + r.won + ' | Lost: ' + r.lost).join('\n\n')
+            + (pool ? '\n\nIn the pool, nobody taken: ' + pool : '');
+    }
+    function tlpRenderReport() {
+        const box = document.getElementById('lead-report'); if (!box) return;
+        if (!tlpHub.leads.length) { box.innerHTML = ''; return; }
+        const day = tlpReportDay || new Date().toLocaleDateString('en-CA');
+        const rows = tlpReportRows(day), open = tlpGroupOpen['__report'];
+        const cell = (v, cls) => `<td class="py-1.5 pr-2 text-center ${v ? (cls || '') : 'text-slate-400'}">${v}</td>`;
+        box.innerHTML = `<button type="button" onclick="tlpGroupOpen['__report']=!tlpGroupOpen['__report'];tlpRenderReport()" class="w-full flex items-center gap-2 px-2.5 py-2 bg-blue-700 text-white rounded-xl text-left">
+                <span class="text-[10px]">${open ? '&#9650;' : '&#9660;'}</span><span class="font-extrabold text-xs">Day report</span>
+                <span class="text-[11px] opacity-80">${rows.reduce((a, r) => a + r.got, 0)} new · ${rows.reduce((a, r) => a + r.due, 0)} due</span></button>
+            ${open ? `<div class="bg-white border border-slate-200 rounded-xl mt-1.5 p-3 space-y-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <input type="date" value="${day}" onchange="tlpReportSet(this.value)" class="${TLP_IN}" style="width:auto">
+                    <button type="button" class="${TLP_BTN} bg-white border border-slate-300 text-slate-700" onclick="tlpReportSet('${new Date(Date.now() - 864e5).toLocaleDateString('en-CA')}')">Yesterday</button>
+                    <button type="button" class="${TLP_BTN} bg-white border border-slate-300 text-slate-700" onclick="tlpReportSet('${new Date().toLocaleDateString('en-CA')}')">Today</button>
+                </div>
+                ${rows.length ? `<div class="overflow-x-auto"><table class="w-full text-[11px] text-left"><thead><tr class="text-slate-500">
+                    <th class="py-1 pr-2">Person</th><th class="py-1 pr-2 text-center">New</th><th class="py-1 pr-2 text-center">Open</th><th class="py-1 pr-2 text-center">Due</th><th class="py-1 pr-2 text-center">Quiet</th><th class="py-1 pr-2 text-center">Quoted</th><th class="py-1 pr-2 text-center">Won</th><th class="py-1 text-center">Lost</th></tr></thead>
+                    <tbody>${rows.map(r => `<tr class="border-t border-slate-100"><td class="py-1.5 pr-2 font-semibold text-slate-800">${tlpE(r.who)}</td>
+                        ${cell(r.got, 'font-bold text-slate-900')}${cell(r.open)}${cell(r.due, 'text-rose-700 font-bold')}${cell(r.quiet, 'text-orange-700 font-bold')}${cell(r.quoted, 'text-amber-700')}${cell(r.won, 'text-emerald-700 font-bold')}${cell(r.lost)}</tr>`).join('')}</tbody></table></div>
+                <div class="flex flex-wrap gap-1.5 pt-1">
+                    <button type="button" class="${TLP_BTN} bg-slate-900 text-white" onclick="tlpReportCopy('${day}')">Copy report</button>
+                    <a target="_blank" rel="noopener" class="${TLP_BTN} bg-emerald-600 text-white" href="https://wa.me/?text=${encodeURIComponent(tlpReportText(day, rows))}">Send on WhatsApp</a>
+                </div>` : '<p class="text-xs text-slate-500">Nothing for this day yet.</p>'}
+            </div>` : ''}`;
+    }
+    function tlpReportCopy(day) {
+        const t = tlpReportText(day, tlpReportRows(day));
+        navigator.clipboard.writeText(t).then(() => showNotification('Report copied', 'success'), () => showNotification('Could not copy', 'error'));
+    }
+
+    // ---------- Swipe on a line: right takes it, left hands it back ----------
+    function tlpSwipeLeads() {
+        const box = document.getElementById('leads-list'); if (!box || box.dataset.swipe) return;
+        box.dataset.swipe = '1';
+        let x0 = 0, y0 = 0, row = null;
+        box.addEventListener('touchstart', e => { const t = e.target.closest('button[onclick^=tlpToggleLead]'); row = t || null; if (t) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; } }, { passive: true });
+        box.addEventListener('touchend', e => {
+            if (!row) return;
+            const dx = e.changedTouches[0].clientX - x0, dy = Math.abs(e.changedTouches[0].clientY - y0);
+            const el = row; row = null;
+            if (Math.abs(dx) < 90 || dy > 45) return;
+            const m = /tlpToggleLead\('([^']+)',(true|false)\)/.exec(el.getAttribute('onclick') || ''); if (!m) return;
+            const id = m[1], hub = m[2] === 'true', L = tlpFindLead(id, hub); if (!L) return;
+            if (dx > 0) { if (hub && !L.owner) tlpLeadClaim(id); else tlpFollowIn(id, hub, 1); }
+            else if (hub && L.owner) tlpLeadDecline(id);
+        }, { passive: true });
     }
 
     function tlpLeadCard(L) {
@@ -6214,6 +6299,12 @@ async function clickSyncButton() {
             <div class="grid grid-cols-2 gap-2">
                 <select onchange="tlpLeadStatus(${q(L.id)},${L.hub},this.value)" class="${TLP_IN}">${TLP_LEAD_STATES.map(s => `<option ${s === L.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
                 <input type="date" value="${tlpE(L.followUp)}" onchange="tlpLeadSet(${q(L.id)},${L.hub},{followUp:this.value})" class="${TLP_IN}" title="Follow-up date">
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+                <span class="text-[10px] text-slate-500 self-center">Follow up</span>
+                ${[['today', 0], ['tomorrow', 1], ['in 3 days', 3], ['next week', 7], ['in 2 weeks', 14]].map(([label, n]) =>
+                    `<button type="button" class="${TLP_BTN} bg-white border border-slate-300 text-slate-700" onclick="tlpFollowIn(${q(L.id)},${L.hub},${n})">${label}</button>`).join('')}
+                ${L.followUp ? `<button type="button" class="${TLP_BTN} text-slate-500" onclick="tlpLeadSet(${q(L.id)},${L.hub},{followUp:''})">clear</button>` : ''}
             </div>
             <textarea rows="2" placeholder="Notes — saved when you tap outside" onchange="tlpLeadNote(${q(L.id)},${L.hub},this)" class="${TLP_IN}" style="font-family:inherit">${tlpE(L.notes)}</textarea>
             <div class="flex flex-wrap gap-1.5">
@@ -6236,6 +6327,7 @@ async function clickSyncButton() {
         const g = id => (document.getElementById(id) || {}).value || '';
         const grp = document.getElementById('lead-group');
         tlpLeadView = { q: g('lead-q'), status: g('lead-status') || 'open', source: g('lead-source'), owner: g('lead-owner'), quick: tlpLeadView.quick, group: grp ? grp.value : tlpLeadView.group, days: g('lead-days') };
+        tlpSaveView();
         tlpRenderLeads();
         const el = document.getElementById('lead-q'); if (el && tlpLeadView.q) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }
@@ -6277,6 +6369,12 @@ async function clickSyncButton() {
     const tlpFindLeadNotes = (id, hub) => { const r = tlpFindLead(id, hub); return r ? (r.notes || '') : ''; };
     const tlpStamp = (old, line) => (old ? old + '\n' : '') + new Date().toLocaleDateString('en-GB') + ' ' + ((currentUser && currentUser.name) || '') + ': ' + line;
     function tlpLeadNote(id, hub, el) { tlpLeadSet(id, hub, { notes: el.value }); }
+    // Dates are fiddly on a phone, so the common ones are one tap.
+    function tlpFollowIn(id, hub, days) {
+        const d = new Date(Date.now() + days * 864e5).toLocaleDateString('en-CA');
+        const L = tlpFindLead(id, hub), was = L && (L.status === 'New');
+        tlpLeadSet(id, hub, was ? { followUp: d, status: 'Contacted' } : { followUp: d });
+    }
     // A small chooser, so a reason is one tap rather than typing
     function tlpAskOne(title, options) {
         return new Promise(resolve => {
@@ -6341,7 +6439,7 @@ async function clickSyncButton() {
     const tlpInstallLeadsBase = tlpInstallSalesUi;
     tlpInstallSalesUi = function () {
         tlpInstallLeadsBase();
-        if (tlpCan('leads')) { tlpLoadHubLeads(); setInterval(() => { if (!document.hidden && tlpHubKey()) tlpLoadHubLeads(true); }, 5 * 60000); }
+        if (tlpCan('leads')) { tlpLoadView(); tlpSwipeLeads(); tlpLoadHubLeads(); setInterval(() => { if (!document.hidden) tlpLoadHubLeads(true); }, 5 * 60000); }
     };
     window.addEventListener('load', async function () {
         try {
