@@ -481,7 +481,7 @@
                                 <p id="lead-conn" class="text-[11px] text-slate-500 mt-1"></p></div>
                             <div class="flex gap-2">
                                 <button type="button" onclick="tlpLoadHubLeads()" class="rounded-lg px-3 py-2 text-xs font-bold bg-white border border-slate-300 text-slate-800">Refresh</button>
-                                <button type="button" onclick="tlpExportLeads()" class="rounded-lg px-3 py-2 text-xs font-bold bg-white border border-slate-300 text-slate-800">Export Excel</button>
+                                
                             </div>
                         </div>
                         <div id="lead-today"></div>
@@ -495,9 +495,10 @@
                         </div>
                     </div>
                     <div id="scan-work"></div>
-                    <div id="leads-waiting"></div>
+                    
                     <div id="lead-team" class="mb-2"></div>
                     <div id="lead-report" class="mb-2"></div>
+                    <div id="lead-sources" class="mb-2"></div>
                     <div id="lead-pool"></div>
                     <p class="text-sm font-bold text-slate-900">Your leads <span id="leads-count" class="text-[11px] font-semibold text-slate-500 ml-1"></span></p>
                     <div id="lead-pick" class="mb-2"></div>
@@ -5660,11 +5661,6 @@ async function clickSyncButton() {
         if (r.error) return showNotification(r.error.message, 'error');
         tlpLeads = tlpLeads.filter(x => String(x.id) !== String(id)); tlpRenderLeads();
     }
-    function tlpExportLeads() {
-        if (!tlpLeads.length) return showNotification('There are no leads to export yet.', 'info');
-        const rows = tlpLeads.map(L => ({ Date: String(L.created_at || '').slice(0, 10), Type: L.kind === 'note' ? 'Note' : 'Visiting card', Name: L.name, Company: L.company, Designation: L.designation, Phone: L.phone, Email: L.email, Website: L.website, Address: L.address, GSTIN: L.gstin, 'Interested in / notes': L.requirement, Products: L.items_text, 'Met at': L.event, Status: L.status, 'Quote no.': L.quote_no, 'Saved by': L.created_by_name, Picture: L.image_url }));
-        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Leads'); XLSX.writeFile(wb, 'TL_Pathak_Leads_' + new Date().toLocaleDateString('en-CA') + '.xlsx');
-    }
     // ---------- Wiring ----------
     function tlpInstallSalesUi() {
         const bar = document.getElementById('tlp-quotes-bar');
@@ -5935,14 +5931,15 @@ async function clickSyncButton() {
     // Leads — one place for every enquiry: the Lead Hub (IndiaMART, email, portals) and cards scanned here.
     // Each person signs in and sees the leads given to them; managers see their team's.
     // =====================================================================================================
-    const TLP_LEAD_STATES = ['New', 'Contacted', 'Follow-up', 'Quoted', 'Negotiation', 'Won', 'Lost'];
+    const TLP_LEAD_STATES = ['New', 'Contacted', 'Quoted', 'Won', 'Lost'];
+    const tlpStates = L => TLP_LEAD_STATES.indexOf(L.status) < 0 && L.status ? TLP_LEAD_STATES.concat([L.status]) : TLP_LEAD_STATES;
     const TLP_LOST_REASONS = ['Price too high', 'Bought elsewhere', 'Not buying now', 'No response', 'Wrong enquiry'];
     const TLP_SRC_COLOR = { IndiaMART: 'bg-orange-100 text-orange-800', Email: 'bg-sky-100 text-sky-800', JustDial: 'bg-amber-100 text-amber-800', TradeIndia: 'bg-violet-100 text-violet-800', Facebook: 'bg-blue-100 text-blue-800', 'Visiting card': 'bg-emerald-100 text-emerald-800', Note: 'bg-slate-100 text-slate-700' };
     let tlpHub = { leads: [], me: null, team: [], error: '', at: 0, tried: false };
-    let tlpLeadView = { q: '', status: 'open', source: '', owner: '', quick: '', group: 'date', days: '', state: '' };
+    let tlpLeadView = { q: '', status: 'open', source: '', owner: '', quick: '', group: 'date', days: '', state: '', account: '' };
     let tlpShowFilters = false;    // the extra filters stay out of the way until asked for
     const tlpViewKey = () => 'tlp_leadview_' + ((currentUser && currentUser.email) || 'x');
-    function tlpSaveView() { try { localStorage.setItem(tlpViewKey(), JSON.stringify({ status: tlpLeadView.status, source: tlpLeadView.source, owner: tlpLeadView.owner, days: tlpLeadView.days, group: tlpLeadView.group, state: tlpLeadView.state })); } catch (e) {} }
+    function tlpSaveView() { try { localStorage.setItem(tlpViewKey(), JSON.stringify({ status: tlpLeadView.status, source: tlpLeadView.source, owner: tlpLeadView.owner, days: tlpLeadView.days, group: tlpLeadView.group, state: tlpLeadView.state, account: tlpLeadView.account })); } catch (e) {} }
     function tlpLoadView() { try { const v = JSON.parse(localStorage.getItem(tlpViewKey()) || '{}'); Object.keys(v).forEach(k => { if (v[k] !== undefined) tlpLeadView[k] = v[k]; }); } catch (e) {} }
     let tlpPicked = {};            // leads ticked for handing out in one go
     let tlpLeadOpen = '';          // the one lead opened out in full
@@ -5964,9 +5961,18 @@ async function clickSyncButton() {
             const r = await tlpHubCall('salesLeads', { scope: tlpIsAdmin() ? 'all' : 'mine', days: 120 });
             if (!r.ok) { tlpHub.error = r.msg || 'The Lead Hub refused the request.'; if (!quiet) tlpRenderLeads(); return; }
             tlpHub.error = ''; tlpHub.leads = r.leads || []; tlpHub.at = Date.now();
+            try { localStorage.setItem('tlp_hub_cache_' + ((currentUser && currentUser.email) || 'x'), JSON.stringify({ at: tlpHub.at, leads: tlpHub.leads.slice(0, 400), me: r.me || null })); } catch (e) {}
             tlpHub.me = r.me ? { name: r.me.name, email: r.me.email, seeAll: !!r.me.senior || tlpIsAdmin() } : null;
             tlpHub.team = (tlpTeamList || []).map(u => ({ name: u.full_name || u.email, email: u.email }));
-        } catch (e) { tlpHub.error = 'The Lead Hub could not be reached. Check the internet and press Refresh.'; }
+        } catch (e) {
+            try {
+                const c = JSON.parse(localStorage.getItem('tlp_hub_cache_' + ((currentUser && currentUser.email) || 'x')) || 'null');
+                if (c && c.leads && c.leads.length) {
+                    tlpHub.leads = c.leads;
+                    tlpHub.error = 'No signal — showing the copy saved at ' + new Date(c.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + '. Anything you change will be sent when the phone is back online.';
+                } else tlpHub.error = 'The Lead Hub could not be reached. Check the internet and press Refresh.';
+            } catch (e2) { tlpHub.error = 'The Lead Hub could not be reached. Check the internet and press Refresh.'; }
+        }
         if (!quiet) tlpRenderLeads();
     }
 
@@ -5997,6 +6003,21 @@ async function clickSyncButton() {
     // A lead nobody has touched for two days is going cold, whoever it sits with.
     const tlpQuietDays = L => { const t = Date.parse(String(L.time || '').replace(' ', 'T')); return isNaN(t) ? 0 : Math.floor((Date.now() - t) / 864e5); };
     const tlpQuiet = L => L.status === 'New' && tlpQuietDays(L) >= 2;
+    // A quotation sent a week ago with no answer is where most orders quietly die.
+    const tlpSilent = L => L.status === 'Quoted' && tlpQuietDays(L) >= 7 && !tlpOverdue(L);
+
+    // Which profile, mailbox or directory a lead arrived through.
+    const tlpAcc = L => L.hub ? (L.account || L.source || 'Other') : 'Visiting cards and notes';
+    const tlpShortAcc = L => {
+        if (!L.hub) return 'Card';
+        const a = String(L.account || '').trim();
+        if (/indiamart/i.test(L.source) && a) return 'IM ' + a.split(/\s+/)[0];
+        return L.source || 'Lead';
+    };
+    const TLP_ACC_COLOR = src => /indiamart/i.test(src) ? 'bg-indigo-100 text-indigo-800'
+        : /mail/i.test(src) ? 'bg-violet-100 text-violet-800'
+        : /justdial|dial/i.test(src) ? 'bg-orange-100 text-orange-800'
+        : /card|note/i.test(src) ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-700';
 
     function tlpLeadsMatching() {
         const v = tlpLeadView, q = v.q.toLowerCase();
@@ -6004,6 +6025,7 @@ async function clickSyncButton() {
             if (v.quick === 'due' && !tlpOverdue(L)) return false;
             if (v.quick === 'new' && !tlpUntouched(L)) return false;
             if (v.quick === 'quiet' && !tlpQuiet(L)) return false;
+            if (v.quick === 'silent' && !tlpSilent(L)) return false;
             if (v.quick === 'quoted' && L.status !== 'Quoted') return false;
             if (!v.quick) {
                 if (v.status === 'open' && ['Won', 'Lost'].indexOf(L.status) >= 0) return false;
@@ -6012,6 +6034,7 @@ async function clickSyncButton() {
             if (v.days && String(L.time).slice(0, 10) < new Date(Date.now() - Number(v.days) * 864e5).toLocaleDateString('en-CA')) return false;
             if (v.source && L.source !== v.source) return false;
             if (v.state && L.state !== v.state) return false;
+            if (v.account && tlpAcc(L) !== v.account) return false;
             if (v.owner && (L.owner || 'Unassigned') !== v.owner) return false;
             return !q || [L.name, L.company, L.product, L.city, L.phone, L.email, L.message, L.notes].join(' ').toLowerCase().includes(q);
         }).sort((a, b) => (tlpOverdue(b) - tlpOverdue(a)) || String(b.time).localeCompare(String(a.time)));
@@ -6019,7 +6042,7 @@ async function clickSyncButton() {
 
     // Leads read better in blocks than as one long list: by the day they came in, or by the
     // IndiaMART profile they came through, which is also the company that will quote them.
-    const TLP_GROUPS = [['date', 'By date'], ['account', 'By IndiaMART profile'], ['state', 'By state'], ['owner', 'By person'], ['', 'One long list']];
+    const TLP_GROUPS = [['date', 'By date'], ['account', 'By IndiaMART profile'], ['', 'One long list']];
     function tlpDayLabel(t) {
         const d = String(t || '').slice(0, 10); if (!d) return 'No date';
         const today = new Date(), day = ms => new Date(today.getTime() - ms * 86400000).toLocaleDateString('en-CA');
@@ -6053,7 +6076,8 @@ async function clickSyncButton() {
         const nDue = all.filter(tlpOverdue).length, nNew = all.filter(tlpUntouched).length, nQuoted = all.filter(L => L.status === 'Quoted').length, nQuiet = all.filter(tlpQuiet).length;
         const chip = (k, n, label, tone) => `<button type="button" onclick="tlpLeadQuick('${k}')" class="rounded-xl px-3 py-2 text-left ${tlpLeadView.quick === k ? tone + ' text-white' : 'bg-white border border-slate-200 text-slate-800'}"><span class="block text-lg font-extrabold leading-none">${n}</span><span class="block text-[10px] font-semibold uppercase tracking-wide mt-0.5 ${tlpLeadView.quick === k ? 'opacity-90' : 'text-slate-500'}">${label}</span></button>`;
         const today = document.getElementById('lead-today');
-        if (today) today.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${chip('due', nDue, 'Follow-up due', 'bg-rose-600')}${chip('new', nNew, 'Not touched', 'bg-blue-600')}${chip('quiet', nQuiet, 'Gone quiet 2 days+', 'bg-orange-600')}${chip('quoted', nQuoted, 'Quoted, waiting', 'bg-amber-600')}</div>`
+        const nSilent = all.filter(tlpSilent).length;
+        if (today) today.innerHTML = `<div class="grid grid-cols-3 ${tlpHubManager() ? 'sm:grid-cols-4' : ''} gap-2">${chip('due', nDue, 'Call today', 'bg-rose-600')}${chip('new', nNew, 'Not touched', 'bg-blue-600')}${chip('quiet', nQuiet, 'Gone quiet', 'bg-orange-600')}${tlpHubManager() ? chip('silent', nSilent, 'Quoted, no reply', 'bg-fuchsia-700') : ''}</div>`
             + (tlpLeadView.quick ? `<p class="text-[11px] text-slate-500 mt-2">Showing one group only. <button type="button" class="font-bold text-blue-700 underline" onclick="tlpLeadQuick('')">Show all leads</button></p>` : '');
 
         // How the team is doing — only the manager sees it, and it stays folded.
@@ -6068,6 +6092,7 @@ async function clickSyncButton() {
                         <td class="py-1.5 pr-2 text-center">${mine.length}</td>
                         <td class="py-1.5 pr-2 text-center ${n(o, tlpOverdue) ? 'text-rose-700 font-bold' : 'text-slate-500'}">${n(o, tlpOverdue)}</td>
                         <td class="py-1.5 pr-2 text-center ${n(o, tlpQuiet) ? 'text-orange-700 font-bold' : 'text-slate-500'}">${n(o, tlpQuiet)}</td>
+                        <td class="py-1.5 pr-2 text-center ${n(o, tlpSilent) ? 'text-fuchsia-700 font-bold' : 'text-slate-500'}">${n(o, tlpSilent)}</td>
                         <td class="py-1.5 pr-2 text-center">${n(o, L => L.status === 'Quoted')}</td>
                         <td class="py-1.5 pr-2 text-center text-emerald-700 font-bold">${n(o, L => L.status === 'Won')}</td>
                         <td class="py-1.5 text-center text-slate-500">${n(o, L => L.status === 'Lost')}</td></tr>`; };
@@ -6076,12 +6101,13 @@ async function clickSyncButton() {
                         <span class="text-[10px]">${tlpGroupOpen['__team'] ? '&#9650;' : '&#9660;'}</span><span class="font-extrabold text-xs">Team</span>
                         <span class="text-[11px] opacity-80">${people.length} people · ${tlpHub.leads.length} leads${poolN ? ' · ' + poolN + ' in pool' : ''}</span></button>
                     ${tlpGroupOpen['__team'] ? `<div class="overflow-x-auto bg-white border border-slate-200 rounded-xl mt-1.5 px-3 py-2"><table class="w-full text-[11px] text-left">
-                        <thead><tr class="text-slate-500"><th class="py-1 pr-2">Person</th><th class="py-1 pr-2 text-center">Leads</th><th class="py-1 pr-2 text-center">Due</th><th class="py-1 pr-2 text-center">Quiet</th><th class="py-1 pr-2 text-center">Quoted</th><th class="py-1 pr-2 text-center">Won</th><th class="py-1 text-center">Lost</th></tr></thead>
+                        <thead><tr class="text-slate-500"><th class="py-1 pr-2">Person</th><th class="py-1 pr-2 text-center">Leads</th><th class="py-1 pr-2 text-center">Due</th><th class="py-1 pr-2 text-center">Quiet</th><th class="py-1 pr-2 text-center">No reply</th><th class="py-1 pr-2 text-center">Quoted</th><th class="py-1 pr-2 text-center">Won</th><th class="py-1 text-center">Lost</th></tr></thead>
                         <tbody>${people.map(row).join('')}</tbody></table></div>` : ''}`;
             }
         }
 
         tlpRenderReport();
+        tlpRenderSources(all);
 
         // Pool: leads nobody owns yet, first to grab keeps them
         const poolBox = document.getElementById('lead-pool');
@@ -6095,7 +6121,7 @@ async function clickSyncButton() {
         const ownList = [...new Set(tlpHub.leads.map(l => l.owner || 'Unassigned'))].sort();
         const sel = (id, cur, items, blank) => `<select id="${id}" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white"><option value="">${blank}</option>${items.map(x => `<option ${x === cur ? 'selected' : ''}>${tlpE(x)}</option>`).join('')}</select>`;
         const fbox = document.getElementById('lead-filters');
-        const extra = (tlpLeadView.status !== 'open' ? 1 : 0) + (tlpLeadView.source ? 1 : 0) + (tlpLeadView.owner ? 1 : 0) + (tlpLeadView.days ? 1 : 0) + (tlpLeadView.state ? 1 : 0);
+        const extra = (tlpLeadView.status !== 'open' ? 1 : 0) + (tlpLeadView.source ? 1 : 0) + (tlpLeadView.owner ? 1 : 0) + (tlpLeadView.days ? 1 : 0) + (tlpLeadView.state ? 1 : 0) + (tlpLeadView.account ? 1 : 0);
         if (fbox) fbox.innerHTML = `<div class="flex gap-2 w-full">
                 <input id="lead-q" type="search" value="${tlpE(tlpLeadView.q)}" placeholder="Search name, company, product, phone" oninput="tlpLeadFilter()" class="flex-1 min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white">
                 <select id="lead-group" onchange="tlpLeadFilter()" class="border border-slate-300 rounded-lg px-2 py-2 text-xs bg-white shrink-0">${TLP_GROUPS.map(([k, label]) => `<option value="${k}" ${k === tlpLeadView.group ? 'selected' : ''}>${label}</option>`).join('')}</select>
@@ -6155,7 +6181,7 @@ async function clickSyncButton() {
         const k = (hub ? 'H' : 'S') + id;
         tlpLeadOpen = tlpLeadOpen === k ? '' : k;
         tlpRenderLeads();
-        if (tlpLeadOpen === k) tlpLeadStock(id, hub);
+        if (tlpLeadOpen === k) { const L = tlpFindShown(id, hub); if (L) { tlpRenderSuggest(L); tlpRenderPhotos(L); } tlpLeadStock(id, hub); }
     }
     // What is on the floor right now, read from the stock app. Quiet if that app is not linked.
     const TLP_STOCK_JS = 'https://pathakh8.github.io/tlp-sales-app/stock/stock-widget.js';
@@ -6171,6 +6197,56 @@ async function clickSyncButton() {
         }).then(S => { if (S && S.config) S.config({ api: TLP_STOCK_API, appUrl: 'https://pathakh8.github.io/tlp-sales-app/stock/' }); return S; });
         return tlpStockReady;
     }
+    // ---------- Machines that may fit ----------
+    // Uses the Smart Finder's own matching, so a lead and a typed search rank machines the same way.
+    function tlpRenderSuggest(L) {
+        const box = document.getElementById('sug-' + tlpKey(L)); if (!box) return;
+        box.innerHTML = '';
+        const q = String(L.product || '') + ' ' + String(L.message || '').slice(0, 300);
+        if (!q.trim() || typeof tlpFindProducts !== 'function') return;
+        let picks = [];
+        try { picks = (tlpFindProducts(q).hits || []).slice(0, 3); } catch (e) { return; }
+        if (!picks.length) return;
+        const mark = h => h.pct >= 85 ? ['Close', 'bg-emerald-100 text-emerald-800'] : h.pct >= 65 ? ['Near', 'bg-amber-100 text-amber-800'] : ['Also', 'bg-slate-200 text-slate-600'];
+        box.innerHTML = `<p class="text-[9px] font-black tracking-widest text-slate-700 mb-1">MACHINES THAT MAY FIT</p>
+            <div class="space-y-1.5">${picks.map(h => { const p = h.r.p || h.r, m = mark(h), img = (p.imageUrls && p.imageUrls[0]) || p.image || '';
+                return `<button type="button" onclick="tlpSuggestOpen('${tlpE(p.id)}')" class="w-full text-left flex items-center gap-2 border border-slate-200 rounded-lg p-1.5">
+                    ${img ? `<img src="${tlpE(img)}" alt="" class="w-10 h-10 rounded object-cover shrink-0" loading="lazy">` : '<span class="w-10 h-10 rounded bg-slate-100 shrink-0"></span>'}
+                    <span class="min-w-0 flex-1"><span class="block text-[11px] font-bold text-slate-900 truncate">${tlpE(p.name)}</span>
+                        <span class="block text-[9.5px] text-slate-500 truncate">${tlpE((h.why && h.why[0]) || '')}</span></span>
+                    <span class="shrink-0 text-[9px] font-black rounded-full px-2 py-0.5 ${m[1]}">${m[0]}</span>
+                </button>`; }).join('')}</div>
+            <p class="text-[9.5px] text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mt-1.5 leading-relaxed"><b>For general reference only.</b> Matched from the words in the enquiry — check capacity, size and power against what the customer asked before quoting.</p>`;
+    }
+    function tlpSuggestOpen(id) { if (id && typeof viewProductSpecs === 'function') viewProductSpecs(id); }
+
+    // ---------- Photos and files kept against a lead ----------
+    const tlpLeadPhotos = L => (tlpLeads || []).filter(x => String(x.event || '') === 'photo:' + (L.hub ? 'H' : 'S') + L.id || (!L.hub && String(x.id) === String(L.id) && x.image_url));
+    function tlpRenderPhotos(L) {
+        const box = document.getElementById('pic-' + tlpKey(L)); if (!box) return;
+        const pics = tlpLeadPhotos(L);
+        box.innerHTML = pics.map(x => `<a target="_blank" rel="noopener" href="${tlpE(x.image_url)}" class="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden block"><img src="${tlpE(x.image_url)}" alt="Photo on this lead" class="w-full h-full object-cover" loading="lazy"></a>`).join('')
+            + `<button type="button" onclick="tlpAddPhoto('${tlpE(L.id)}',${L.hub})" class="w-12 h-12 rounded-lg border border-dashed border-slate-400 text-slate-500 text-lg leading-none">+</button>
+               <span class="text-[9.5px] text-slate-500 leading-tight">Site photo, drawing,<br>hand-written specs</span>`;
+    }
+    function tlpAddPhoto(id, hub) {
+        const L = tlpFindShown(id, hub); if (!L) return;
+        const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+        inp.onchange = async () => {
+            const f = inp.files && inp.files[0]; if (!f) return;
+            showNotification('Saving the photo…', 'info');
+            try {
+                const dataUrl = await tlpPhotoToJpeg(f, 1400);
+                const r = await tlpApi({ action: 'lead_save', lead: { kind: 'photo', name: L.name || '', company: L.company || '', phone: L.phone || '', requirement: L.product || '', event: 'photo:' + (hub ? 'H' : 'S') + id, status: 'Photo' }, image_base64: dataUrl.split(',')[1] });
+                if (r.error) throw new Error(r.error.message);
+                await tlpLoadLeads();
+                tlpRenderPhotos(L);
+                showNotification('Photo saved to this lead', 'success');
+            } catch (e) { showNotification('Could not save the photo: ' + e.message, 'error'); }
+        };
+        inp.click();
+    }
+
     async function tlpLeadStock(id, hub) {
         const L = (hub ? tlpHub.leads.map(tlpNormHub) : (tlpLeads || []).map(tlpNormScan)).find(x => String(x.id) === String(id));
         if (!L) return;
@@ -6244,17 +6320,20 @@ async function clickSyncButton() {
             <div class="flex items-center gap-1.5">
             ${L.hub && tlpHubManager() ? `<label class="shrink-0 pl-0.5" onclick="event.stopPropagation()"><input type="checkbox" ${tlpPicked[tlpKey(L)] ? 'checked' : ''} onchange="tlpPick(${q(L.id)},this.checked)"></label>` : ''}
             <button type="button" onclick="tlpToggleLead(${q(L.id)},${L.hub})" class="flex-1 min-w-0 text-left flex items-center gap-2.5 px-2.5 py-2 bg-white border ${tlpOverdue(L) ? 'border-rose-300' : 'border-slate-200'} ${open ? 'rounded-t-xl border-b-0' : 'rounded-xl'}">
-                <span class="${tier} text-white text-[11px] font-extrabold rounded-lg w-7 h-7 flex items-center justify-center shrink-0">${L.score === '' || L.score === undefined ? '·' : tlpE(L.score)}</span>
+                <span class="${tier} rounded-lg w-2.5 h-7 shrink-0" title="${tlpE(L.tier || '')}"></span>
                 <span class="min-w-0 flex-1">
                     <span class="block font-bold text-[12px] text-slate-900 truncate">${tlpE(L.product)}</span>
                     <span class="block text-[10px] text-slate-500 truncate">${tlpE([L.name || L.company, L.city, String(L.time).slice(11, 16)].filter(Boolean).join(' · '))}</span>
                 </span>
+                <span class="shrink-0 text-[8.5px] font-extrabold rounded-full px-1.5 py-0.5 ${TLP_ACC_COLOR(L.source)}">${tlpE(tlpShortAcc(L))}</span>
+                ${tlpKnownClient(L) ? '<span class="shrink-0 text-[9px] font-black uppercase rounded-full px-1.5 py-0.5 bg-emerald-100 text-emerald-800" title="Already your client">Repeat</span>' : ''}
                 ${L.hub ? `<span class="shrink-0 text-[9px] font-bold rounded-full px-2 py-0.5 ${L.owner ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'}">${L.owner ? tlpE(L.owner) : 'Pool'}</span>` : ''}
                 ${tlpWaNo(L) ? `<span class="shrink-0 flex gap-1" onclick="event.stopPropagation()">
                     <a href="tel:+${tlpWaNo(L)}" class="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[11px]" title="Call">&#9742;</a>
                     <a target="_blank" rel="noopener" href="https://wa.me/${tlpWaNo(L)}?text=${tlpHello(L)}" class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[11px] font-bold" title="WhatsApp">W</a></span>` : ''}
                 ${tlpOverdue(L) ? '<span class="shrink-0 text-[9px] font-black uppercase rounded-full px-1.5 py-0.5 bg-rose-600 text-white">Due</span>' : ''}
                 ${tlpQuiet(L) ? `<span class="shrink-0 text-[9px] font-black uppercase rounded-full px-1.5 py-0.5 bg-orange-100 text-orange-800">Quiet ${tlpQuietDays(L)}d</span>` : ''}
+                ${tlpSilent(L) ? `<span class="shrink-0 text-[9px] font-black uppercase rounded-full px-1.5 py-0.5 bg-fuchsia-100 text-fuchsia-800" title="Quotation sent, no answer">No reply ${tlpQuietDays(L)}d</span>` : ''}
                 <span class="shrink-0 text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 ${stateCol}">${tlpE(L.status)}</span>
                 <span class="shrink-0 text-slate-400 text-[10px]">${open ? '&#9650;' : '&#9660;'}</span>
             </button>
@@ -6276,6 +6355,7 @@ async function clickSyncButton() {
             return { who: o, got: got.length, untouched: n(got, tlpUntouched),
                 open: n(mine, L => ['Won', 'Lost'].indexOf(L.status) < 0),
                 due: n(mine, tlpOverdue), quiet: n(mine, tlpQuiet),
+                silent: n(mine, tlpSilent),
                 quoted: n(mine, L => L.status === 'Quoted'), won: n(mine, L => L.status === 'Won'), lost: n(mine, L => L.status === 'Lost') };
         }).filter(r => r.got || r.open || r.won);
     }
@@ -6286,8 +6366,42 @@ async function clickSyncButton() {
             + rows.map(r => r.who + '\n  New today: ' + r.got + (r.untouched ? ' (' + r.untouched + ' not touched)' : '')
                 + '\n  Open: ' + r.open + ' | Follow-up due: ' + r.due + ' | Quiet: ' + r.quiet
                 + '\n  Quoted: ' + r.quoted + ' | Won: ' + r.won + ' | Lost: ' + r.lost).join('\n\n')
-            + (pool ? '\n\nIn the pool, nobody taken: ' + pool : '');
+            + (pool ? '\n\nIn the pool, nobody taken: ' + pool : '')
+            + (() => { const r = tlpLostReasons(); return r.length ? '\n\nWhy leads were lost:\n' + r.map(x => '  ' + x[0] + ': ' + x[1]).join('\n') : ''; })();
     }
+    // Where the leads came from: one bar per profile, mailbox or directory.
+    function tlpRenderSources(all) {
+        const box = document.getElementById('lead-sources'); if (!box) return;
+        if (!tlpHubManager() || !tlpHub.leads.length) { box.innerHTML = ''; return; }
+        const counts = {};
+        tlpHub.leads.map(tlpNormHub).concat((tlpLeads || []).map(tlpNormScan)).forEach(L => { const k = tlpAcc(L); counts[k] = (counts[k] || 0) + 1; });
+        const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]), top = rows.length ? rows[0][1] : 1, open = tlpGroupOpen['__src'];
+        const esc = v => "'" + String(v).replace(/'/g, "\\'") + "'";
+        box.innerHTML = `<button type="button" onclick="tlpGroupOpen['__src']=!tlpGroupOpen['__src'];tlpRenderLeads()" class="w-full flex items-center gap-2 px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-left">
+                <span class="text-[10px] text-slate-500">${open ? '&#9650;' : '&#9660;'}</span>
+                <span class="font-extrabold text-xs text-slate-900">Where they came from</span>
+                <span class="text-[11px] text-slate-500">${rows.length} source${rows.length === 1 ? '' : 's'}</span>
+                ${tlpLeadView.account ? `<span class="ml-auto text-[9px] font-bold bg-indigo-100 text-indigo-800 rounded-full px-2 py-0.5">${tlpE(tlpLeadView.account)}</span>` : ''}</button>
+            ${open ? `<div class="bg-white border border-slate-200 rounded-xl mt-1.5 p-3 space-y-2">
+                ${rows.map(([name, n]) => `<button type="button" onclick="tlpLeadView.account = tlpLeadView.account === ${esc(name)} ? '' : ${esc(name)}; tlpSaveView(); tlpRenderLeads()" class="w-full text-left">
+                    <span class="flex items-baseline gap-2"><span class="text-[11px] font-bold text-slate-900 truncate">${tlpE(name)}</span><span class="flex-1"></span><span class="text-[11px] font-extrabold text-slate-900">${n}</span></span>
+                    <span class="block h-2 bg-slate-200 rounded-full overflow-hidden mt-1"><span class="block h-2 ${tlpLeadView.account === name ? 'bg-slate-900' : 'bg-indigo-600'}" style="width:${Math.max(3, Math.round(n / top * 100))}%"></span></span>
+                </button>`).join('')}
+                <p class="text-[9.5px] text-slate-500">Tap a bar to see only that profile. Tap it again for all of them.</p>
+            </div>` : ''}`;
+    }
+
+    // The reason is stamped into the notes when a lead is marked Lost.
+    function tlpLostReasons() {
+        const out = {};
+        tlpHub.leads.map(tlpNormHub).filter(L => L.status === 'Lost').forEach(L => {
+            const m = String(L.notes || '').match(/Lost[:\u2014-]\s*([^\n]{2,40})/i);
+            const why = m ? m[1].trim() : 'Not said';
+            out[why] = (out[why] || 0) + 1;
+        });
+        return Object.entries(out).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    }
+
     function tlpRenderReport() {
         const box = document.getElementById('lead-report'); if (!box) return;
         if (!tlpHub.leads.length) { box.innerHTML = ''; return; }
@@ -6304,9 +6418,10 @@ async function clickSyncButton() {
                     <button type="button" class="${TLP_BTN} bg-white border border-slate-300 text-slate-700" onclick="tlpReportSet('${new Date().toLocaleDateString('en-CA')}')">Today</button>
                 </div>
                 ${rows.length ? `<div class="overflow-x-auto"><table class="w-full text-[11px] text-left"><thead><tr class="text-slate-500">
-                    <th class="py-1 pr-2">Person</th><th class="py-1 pr-2 text-center">New</th><th class="py-1 pr-2 text-center">Open</th><th class="py-1 pr-2 text-center">Due</th><th class="py-1 pr-2 text-center">Quiet</th><th class="py-1 pr-2 text-center">Quoted</th><th class="py-1 pr-2 text-center">Won</th><th class="py-1 text-center">Lost</th></tr></thead>
+                    <th class="py-1 pr-2">Person</th><th class="py-1 pr-2 text-center">New</th><th class="py-1 pr-2 text-center">Open</th><th class="py-1 pr-2 text-center">Due</th><th class="py-1 pr-2 text-center">Quiet</th><th class="py-1 pr-2 text-center">No reply</th><th class="py-1 pr-2 text-center">Quoted</th><th class="py-1 pr-2 text-center">Won</th><th class="py-1 text-center">Lost</th></tr></thead>
                     <tbody>${rows.map(r => `<tr class="border-t border-slate-100"><td class="py-1.5 pr-2 font-semibold text-slate-800">${tlpE(r.who)}</td>
-                        ${cell(r.got, 'font-bold text-slate-900')}${cell(r.open)}${cell(r.due, 'text-rose-700 font-bold')}${cell(r.quiet, 'text-orange-700 font-bold')}${cell(r.quoted, 'text-amber-700')}${cell(r.won, 'text-emerald-700 font-bold')}${cell(r.lost)}</tr>`).join('')}</tbody></table></div>
+                        ${cell(r.got, 'font-bold text-slate-900')}${cell(r.open)}${cell(r.due, 'text-rose-700 font-bold')}${cell(r.quiet, 'text-orange-700 font-bold')}${cell(r.silent, 'text-fuchsia-700 font-bold')}${cell(r.quoted, 'text-amber-700')}${cell(r.won, 'text-emerald-700 font-bold')}${cell(r.lost)}</tr>`).join('')}</tbody></table></div>
+                ${(() => { const r = tlpLostReasons(); return r.length ? `<p class="text-[10.5px] text-slate-600"><b>Why they were lost:</b> ${r.map(x => tlpE(x[0]) + ' ' + x[1]).join(' · ')}</p>` : ''; })()}
                 <div class="flex flex-wrap gap-1.5 pt-1">
                     <button type="button" class="${TLP_BTN} bg-slate-900 text-white" onclick="tlpReportCopy('${day}')">Copy report</button>
                     <a target="_blank" rel="noopener" class="${TLP_BTN} bg-emerald-600 text-white" href="https://wa.me/?text=${encodeURIComponent(tlpReportText(day, rows))}">Send on WhatsApp</a>
@@ -6343,15 +6458,18 @@ async function clickSyncButton() {
         const tier = { Hot: 'bg-rose-600', Warm: 'bg-amber-500', Cold: 'bg-blue-500', Junk: 'bg-slate-400' }[L.tier] || 'bg-slate-700';
         const stateCol = { New: 'bg-blue-100 text-blue-800', Won: 'bg-emerald-100 text-emerald-800', Lost: 'bg-slate-200 text-slate-600' }[L.status] || 'bg-slate-100 text-slate-700';
         return `<div class="bg-white border ${tlpOverdue(L) ? 'border-rose-300' : 'border-slate-200'} border-t-0 rounded-b-xl p-3 text-xs space-y-2">
-            <p class="text-[10px] text-slate-500">${tlpE([L.name, L.company, L.city, L.time].filter(Boolean).join(' · '))}
-                <span class="text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 ml-1 ${TLP_SRC_COLOR[L.source] || 'bg-slate-100 text-slate-700'}">${tlpE(L.source)}</span></p>
+            <div class="bg-indigo-50 border border-indigo-100 rounded-lg px-2.5 py-2">
+                <p class="text-[9px] font-black tracking-widest text-indigo-800">CAME IN THROUGH</p>
+                <p class="text-[11px] text-indigo-950 leading-relaxed mt-0.5"><b>${tlpE(tlpAcc(L))}</b>${L.typeName ? ' · ' + tlpE(L.typeName) : ''}<br>${tlpE(L.time)}${L.score !== '' && L.score !== undefined ? ' · score ' + tlpE(L.score) + (L.tier ? ' (' + tlpE(L.tier) + ')' : '') : ''}</p>
+            </div>
+            <p class="text-[10px] text-slate-500">${tlpE([L.name, L.company, L.city].filter(Boolean).join(' · '))}</p>
             ${L.hub ? `<p class="text-[11px] ${L.owner ? 'text-slate-700' : 'text-amber-800'}">${L.owner ? 'With <b>' + tlpE(L.owner) + '</b>' : 'In the pool — nobody has taken this yet'}${L.followUp ? ' · follow up ' + tlpE(L.followUp) : ''}</p>` : ''}
             ${client ? `<p class="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1">Already your client: ${tlpE(client.name)}${client.city ? ', ' + tlpE(client.city) : ''}</p>` : ''}
             <p id="stk-${tlpE(tlpKey(L))}" class="text-[11px] text-slate-500"></p>
             ${L.message ? `<p class="text-slate-600 bg-slate-50 rounded-lg p-2" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${tlpE(L.message)}</p>` : ''}
             ${L.quoteNo ? `<p class="text-[11px] text-blue-800">Quotation ${tlpE(L.quoteNo)} made</p>` : ''}
             <div class="grid grid-cols-2 gap-2">
-                <select onchange="tlpLeadStatus(${q(L.id)},${L.hub},this.value)" class="${TLP_IN}">${TLP_LEAD_STATES.map(s => `<option ${s === L.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
+                <select onchange="tlpLeadStatus(${q(L.id)},${L.hub},this.value)" class="${TLP_IN}">${tlpStates(L).map(s => `<option ${s === L.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
                 <input type="date" value="${tlpE(L.followUp)}" onchange="tlpLeadSet(${q(L.id)},${L.hub},{followUp:this.value})" class="${TLP_IN}" title="Follow-up date">
             </div>
             <div class="flex flex-wrap gap-1.5">
@@ -6360,11 +6478,17 @@ async function clickSyncButton() {
                     `<button type="button" class="${TLP_BTN} bg-white border border-slate-300 text-slate-700" onclick="tlpFollowIn(${q(L.id)},${L.hub},${n})">${label}</button>`).join('')}
                 ${L.followUp ? `<button type="button" class="${TLP_BTN} text-slate-500" onclick="tlpLeadSet(${q(L.id)},${L.hub},{followUp:''})">clear</button>` : ''}
             </div>
+            <div id="sug-${tlpE(tlpKey(L))}"></div>
+            <div>
+                <p class="text-[9px] font-black tracking-widest text-slate-700 mb-1">PHOTOS AND FILES</p>
+                <div id="pic-${tlpE(tlpKey(L))}" class="flex flex-wrap gap-1.5 items-center"></div>
+            </div>
             <textarea rows="2" placeholder="Notes — saved when you tap outside" onchange="tlpLeadNote(${q(L.id)},${L.hub},this)" class="${TLP_IN}" style="font-family:inherit">${tlpE(L.notes)}</textarea>
             <div class="flex flex-wrap gap-1.5">
                 ${d ? `<a href="tel:+${wa}" class="${TLP_BTN} bg-slate-900 text-white">Call</a><a target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${hello}" class="${TLP_BTN} bg-emerald-600 text-white">WhatsApp</a>` : ''}
                 ${L.email ? `<a href="mailto:${tlpE(L.email)}" class="${TLP_BTN} bg-white border border-slate-300 text-slate-800">Email</a>` : ''}
                 ${tlpCan('quotes') ? `<button type="button" class="${TLP_BTN} bg-blue-600 text-white" onclick="tlpLeadQuote(${q(L.id)},${L.hub})">Make quote</button>` : ''}
+                ${(() => { const Q = tlpLastQuote(L); return Q && Q.pdf_url ? `<a target="_blank" rel="noopener" href="${tlpE(Q.pdf_url)}" class="${TLP_BTN} bg-white border border-slate-300 text-slate-700" title="Quotation already sent to this number">Last quote ${tlpE(Q.quote_no || '')}</a>` : ''; })()}
                 ${L.message ? `<button type="button" class="${TLP_BTN} bg-white border border-slate-300 text-slate-800" onclick="tlpLeadToFinder(${q(L.id)},${L.hub})">Find product</button>` : ''}
                 ${L.image ? `<a target="_blank" rel="noopener" href="${tlpE(L.image)}" class="${TLP_BTN} bg-white border border-slate-300 text-slate-800">Picture</a>` : ''}
             </div>
@@ -6385,9 +6509,11 @@ async function clickSyncButton() {
         tlpRenderLeads();
         const el = document.getElementById('lead-q'); if (el && tlpLeadView.q) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }
-    function tlpClearLeadFilters() { tlpLeadView = Object.assign(tlpLeadView, { status: 'open', source: '', owner: '', days: '', state: '' }); tlpSaveView(); tlpRenderLeads(); }
+    function tlpClearLeadFilters() { tlpLeadView = Object.assign(tlpLeadView, { status: 'open', source: '', owner: '', days: '', state: '', account: '' }); tlpSaveView(); tlpRenderLeads(); }
     function tlpLeadQuick(k) { tlpLeadView.quick = tlpLeadView.quick === k ? '' : k; tlpRenderLeads(); }
     const tlpFindLead = (id, hub) => (hub ? tlpHub.leads.find(l => String(l.id) === String(id)) : (tlpLeads || []).find(l => String(l.id) === String(id)));
+    // the same lead in the shape the screen uses (hub flag, product, city, tier …)
+    const tlpFindShown = (id, hub) => { const raw = tlpFindLead(id, hub); return raw ? (hub ? tlpNormHub(raw) : tlpNormScan(raw)) : null; };
 
     // One saving path for both kinds: the Hub keeps its leads, our own sheet keeps the scanned ones.
     async function tlpLeadSet(id, hub, fields, quiet) {
@@ -6454,6 +6580,11 @@ async function clickSyncButton() {
         const m = document.getElementById('quotepdf-modal'); m.dataset.hubLeadId = L.id; delete m.dataset.leadId;
         document.getElementById('qp-mode').textContent = 'Quote for ' + (L.company || L.name || 'this lead') + ' (' + L.source + ')' + (L.message ? ' — wants: ' + String(L.message).slice(0, 80) : '');
         qpUpdateTotals();
+    }
+    function tlpLastQuote(L) {
+        const d = tlpDigits(L.phone).slice(-10); if (!d) return null;
+        return (typeof tlpQuotes !== 'undefined' ? tlpQuotes : []).filter(x => tlpDigits(x.customer_phone).slice(-10) === d)
+            .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
     }
     function tlpLeadToFinder(id, hub) {
         const row = tlpFindLead(id, hub); if (!row) return;
