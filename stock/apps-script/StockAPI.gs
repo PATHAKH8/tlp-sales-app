@@ -147,6 +147,7 @@ function handle_(p, isPost) {
     if (viewer) return out_({ ok: false, error: 'Your account is view-only' });
     if (a === 'vision') return out_({ ok: true, result: vision_(String(p.prompt || ''), p.images || []) });
     if (a === 'json') return out_({ ok: true, result: jsonText_(String(p.prompt || '')) });
+    if (a === 'transcribe') return out_({ ok: true, text: transcribe_(String(p.audio || '')) });
     if (a === 'text') return out_({ ok: true, answer: gemini_([{ text: String(p.prompt || '').slice(0, 200000) }], false) });
 
     const lock = LockService.getScriptLock();
@@ -664,3 +665,18 @@ function changePw_(me, old, pw) {
 }
 function endSessions_(email) { const all = P.getProperties(); Object.keys(all).forEach(k => { if (k.indexOf('S_') === 0) { try { if (JSON.parse(all[k]).email === email) P.deleteProperty(k); } catch (e) {} } }); }
 function cleanSessions_() { const all = P.getProperties(), now = Date.now(); Object.keys(all).forEach(k => { if (k.indexOf('S_') === 0) { try { if (JSON.parse(all[k]).exp < now) P.deleteProperty(k); } catch (e) { P.deleteProperty(k); } } }); }
+
+/* ---------------- voice → text ---------------- */
+function transcribe_(d) {
+  const m = d.match(/^data:(audio\/[\w.+-]+);base64,(.+)$/);
+  if (!m) throw new Error('No audio received');
+  if (m[2].length > 8e6) throw new Error('Recording too long — keep it under 90 seconds');
+  const txt = gemini_([
+    { text: 'This is a short voice note from a salesperson at an industrial machinery showroom in India (lathes, drills, presses, pallet trucks, construction machines). ' +
+      'Write down what they said as clear English text. If they spoke Hindi, Bengali or a mix, translate it to English. ' +
+      'Keep numbers, sizes and units (ft, inch, mm, ton, HP, kW), model codes, serial numbers, names and phone numbers exactly. ' +
+      'Do not add anything that was not said. If there is no speech, reply with nothing. Reply with only the text.' },
+    { inline_data: { mime_type: m[1], data: m[2] } }
+  ], false);
+  return String(txt || '').trim().replace(/^"|"$/g, '');
+}

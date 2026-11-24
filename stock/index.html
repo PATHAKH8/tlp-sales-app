@@ -226,6 +226,13 @@ label.btn,label.bigcam,label.ph{cursor:pointer}
 .tbl td.n{text-align:right;font-family:"JetBrains Mono",monospace;white-space:nowrap}
 .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--blue-l);color:var(--blue)}
 .lock{font-size:12px;color:var(--warn);font-weight:700}
+.micb{flex:none;min-width:44px;height:42px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:17px;font-weight:700;padding:0 10px;color:var(--ink)}
+.micb.rec{background:var(--red);color:#fff;border-color:var(--red);animation:pulse2 1.2s infinite}
+.search .micb{height:34px;min-width:34px;border:0;background:var(--bg)}
+@keyframes pulse2{50%{box-shadow:0 0 0 6px rgba(215,38,46,.18)}}
+#micbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + var(--sb));z-index:61;background:var(--ink);color:#fff;padding:10px 16px;border-radius:14px;font-size:14.5px;font-weight:600;max-width:90vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#micbar i{font-weight:400;opacity:.85}
+.dotrec{display:inline-block;width:10px;height:10px;border-radius:50%;background:#ff4d4d;margin-right:6px;animation:pulse 1s infinite}
 </style>
 </head>
 <body>
@@ -293,7 +300,7 @@ function myLoc(){return lsGet('tlp_myloc')||''}
 
 /* ================= state ================= */
 let MODE=null; // 'claude' (hosted in Claude, live db) | 'sheet' (your Google Sheet via Apps Script) | 'none'
-const K={db:null,user:null,sample:null,assets:null,meId:'',canEdit:false,canWrite:true,aiImages:null,aiOk:true};
+const K={dict:null,db:null,user:null,sample:null,assets:null,meId:'',canEdit:false,canWrite:true,aiImages:null,aiOk:true};
 const S={items:[],locations:[],log:[],purchases:[],sales:[],clients:[],pricelists:[],ver:'',loaded:false};
 const names={};
 const ui={view:'home',q:window._startQ||'',fLoc:'all',fCat:'all',showSold:false,open:{},logLoc:'all',snapMode:'machine',buyMode:'sales',bq:''};
@@ -582,7 +589,7 @@ function homeV(v){
   <div class="h">By category</div>
   <div class="card" style="padding:4px 14px">${Object.keys(byCat).length?Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<button class="bar-row" data-cat="${esc(c)}"><div class="nm"><span class="t">${esc(c)}</span></div><div class="num">${n}</div><div class="bar"><i style="width:${(n/maxC*100).toFixed(0)}%;background:var(--red)"></i></div></button>`).join(''):`<div class="empty"><b>No stock yet</b>Tap the red camera and snap your first machine.</div>`}</div>
   <div class="h">Ask the stock</div>
-  <div class="card"><div class="row"><input id="askQ" class="inp" placeholder="${canCost()?'e.g. What did we pay for 6 ft lathes?':'e.g. Where do we have 8 ft lathes?'}" enterkeyhint="send"><button id="askBtn" class="btn">Ask</button></div><div id="askA" class="answer"></div></div>
+  <div class="card"><div class="row"><input id="askQ" class="inp" placeholder="${canCost()?'e.g. What did we pay for 6 ft lathes?':'e.g. Where do we have 8 ft lathes?'}" enterkeyhint="send">${micBtn('ask')}<button id="askBtn" class="btn">Ask</button></div><div id="askA" class="answer"></div></div>
   ${recent.length?`<div class="h">Recently updated <button data-go="log">All moves</button></div><div class="grp">${recent.map(itemRow).join('')}</div>`:''}
   <div class="foot">TL Pathak Group · Think Machines, Think Us.${MODE==='sheet'?' · synced with your Google Sheet':''}</div>`;
 }
@@ -591,7 +598,7 @@ function itemRow(i){return `<button class="it" data-item="${esc(i.id)}"><div cla
 /* ---- stock ---- */
 function stockV(v){
   const cats=[...new Set(S.items.map(i=>i.category||'Other'))];
-  v.innerHTML=`<div class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A919C" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="sq" placeholder="Search lathe, 6 ft, model, serial…" value="${esc(ui.q)}" autocomplete="off"></div>
+  v.innerHTML=`<div class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A919C" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="sq" placeholder="Search lathe, 6 ft, model, serial…" value="${esc(ui.q)}" autocomplete="off">${micBtn('search')}</div>
   <div class="row" style="margin-bottom:8px"><select id="sloc" class="sel"><option value="all">All locations</option>${sortedLocs().map(l=>`<option value="${esc(l.id)}" ${ui.fLoc===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select><button class="chip ${ui.showSold?'on':''}" id="ssold">Sold too</button></div>
   <div class="chips"><button class="chip ${ui.fCat==='all'?'on':''}" data-fcat="all">All</button>${cats.map(c=>`<button class="chip ${ui.fCat===c?'on':''}" data-fcat="${esc(c)}">${esc(c)}</button>`).join('')}</div>
   <div id="list"></div><div class="row" style="justify-content:center;margin-top:14px"><button class="btn ghost" id="copyList">Copy list for Excel / WhatsApp</button></div>`;
@@ -627,7 +634,7 @@ function machineHTML(){
       <label class="bigcam" for="mPick" aria-label="Take or choose a photo">${IC.cam}</label>
       <h2>Snap a machine</h2>
       <p>Tap the camera → <b>Take Photo</b>. AI reads the type, size &amp; nameplate and files it under the right group.<br>Tip: add a 2nd photo of the nameplate for exact model &amp; serial.</p>
-      <div class="row" style="justify-content:center;flex-wrap:wrap"><label class="btn ghost" for="mCam">Open camera</label><label class="btn ghost" for="mGal">From gallery</label><button class="btn ghost" id="manualGo">Type it in</button></div>
+      <div class="row" style="justify-content:center;flex-wrap:wrap"><label class="btn ghost" for="mCam">Open camera</label><label class="btn ghost" for="mGal">From gallery</label><button class="btn ghost" id="manualGo">Type it in</button>${micAvail()?`<button class="btn ghost" data-mic="snapAll">🎤 Say it</button>`:''}</div>
     </div>${aiNote()}
     <div class="muted" style="text-align:center">Adding at: <b>${esc(locById(myLoc())?.name||'— pick 📍 at the top —')}</b></div>`;
   const f=snap.form,match=findMatch();let ai='';
@@ -638,6 +645,7 @@ function machineHTML(){
   return `${!snap.manual||snap.photos.length?`<div class="photos">${snap.photos.map((p,ix)=>`<div class="ph" style="${cssUrl(p.thumb)}"><button data-rmph="${ix}" aria-label="Remove">×</button></div>`).join('')}${snap.photos.length<3?`<label class="ph add" for="mPick">＋<br>Nameplate /<br>another angle</label>`:''}</div>`:''}
   ${ai}${!snap.busy&&!snap.aiDone&&!snap.err?aiNote():''}
   ${snap.photos.length&&!snap.busy?`<div class="row" style="margin:-4px 0 12px"><button class="btn soft" id="reread">↻ Read ${snap.aiDone||snap.err?'again':'with AI'}${snap.photos.length>1?' (all photos)':''}</button></div>`:''}
+  ${micAvail()?`<div class="row" style="margin:-4px 0 12px">${micBtn('snapAll','Speak details')}<span class="muted" style="font-size:12.5px">e.g. “6 feet all geared lathe, model AG-6, 2 pieces, blue”</span></div>`:''}
   ${match?`<div class="match">Already in stock here: <b>${esc(match.name||groupOf(match))}</b> × ${q(match)}<div class="row"><button class="btn" id="addToMatch">Add ${f.qty} to it → ${q(match)+(+f.qty||1)}</button></div></div>`:''}
   ${bp?`<div class="buyline">🔒 ${bp.listOnly?`Price list net <b>${inr(bp.pl.net)}</b> (${esc(bp.pl.mfr)})`:`Last bought at <b>${inr(bp.last)}</b> from ${esc(bp.supplier)} (${esc(fdate(bp.date))})`}</div>`:''}
   <div class="card">
@@ -658,7 +666,7 @@ function machineHTML(){
     <label class="fld"><span>Location</span><select class="sel" data-f="locationId">${locOptions(f.locationId,'— Choose showroom / warehouse —')}</select></label>
     <div class="grid2"><div class="fld"><span>Quantity</span><div class="stepper"><button id="qm">−</button><input id="qv" inputmode="numeric" value="${esc(f.qty)}"><button id="qp">+</button></div></div>
     <label class="fld"><span>Status</span><select class="sel" data-f="status">${STATUS.filter(s=>s!=='Sold').map(s=>`<option ${s===f.status?'selected':''}>${esc(s)}</option>`).join('')}</select></label></div>
-    <label class="fld"><span>Notes</span><input class="inp" data-f="notes" value="${esc(f.notes)}" placeholder="Bay no., accessories, paint colour…"></label>
+    <div class="fld"><span>Notes</span><div class="row"><input class="inp" data-f="notes" value="${esc(f.notes)}" placeholder="Bay no., accessories, paint colour…">${micBtn('snapNotes')}</div></div>
   </div>
   <button class="btn red block" id="saveSnap" ${snap.busy?'disabled':''} style="padding:15px;font-size:17px">Save to stock</button>
   <button class="btn ghost block" id="cancelSnap" style="margin-top:8px">Cancel</button>`;
@@ -699,7 +707,7 @@ function invHTML(){
     <span>Freight / other</span><input class="inp" inputmode="decimal" data-if="freight" value="${esc(f.freight)}">
     <span>Invoice total</span><input class="inp" inputmode="decimal" data-if="total" value="${esc(f.total)}">
   </div><div id="invWarn" class="muted" style="margin-top:8px;color:var(--red)">${diff?`⚠️ Lines + GST + freight = ${inr(calc)}, but invoice total says ${inr(f.total)}. Check the numbers.`:''}</div>
-  <label class="fld" style="margin-top:10px"><span>Notes</span><input class="inp" data-if="notes" value="${esc(f.notes)}"></label></div>
+  <div class="fld" style="margin-top:10px"><span>Notes</span><div class="row"><input class="inp" data-if="notes" value="${esc(f.notes)}">${micBtn('invNotes')}</div></div></div>
   <button class="btn block" id="saveInv" ${inv.busy||inv.saving?'disabled':''} style="padding:15px;font-size:17px;background:var(--blue-d)">${inv.saving?'Saving…':'Save invoice'+(f.lines.some(l=>l.addStock&&l.group)?' + add to stock':'')}</button>
   <button class="btn ghost block" id="cancelInv" style="margin-top:8px">Cancel</button>`;
 }
@@ -839,6 +847,7 @@ $('#locBtn').onclick=pickMyLoc;$('#setBtn').onclick=openSettings;$('#sheetBg').o
 window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(VIEWS.includes(h)&&h!==ui.view){ui.view=h;renderView()}});
 document.addEventListener('click',async e=>{
   const t=e.target.closest('button');if(!t)return;const d=t.dataset;
+  if(d.mic){micToggle(d.mic,t);return}
   if(d.go){go(d.go);return}
   if(d.goinv){ui.snapMode='inv';go('snap');return}
   if(d.gosale){ui.snapMode='sale';if(d.fromloc){sale.f.locationId=d.fromloc}closeSheet();go('snap');return}
@@ -1077,7 +1086,7 @@ function saleHTML(){
     <span>Freight / other</span><input class="inp" inputmode="decimal" data-sf="freight" value="${esc(f.freight)}">
     <span>Invoice total</span><input class="inp" inputmode="decimal" data-sf="total" value="${esc(f.total)}">
   </div><div id="saleWarn" class="muted" style="margin-top:8px;color:var(--red)">${diff?`⚠️ Lines + GST + freight = ${inr(calc)}, but invoice total says ${inr(f.total)}.`:''}</div>
-  <label class="fld" style="margin-top:10px"><span>Notes</span><input class="inp" data-sf="notes" value="${esc(f.notes)}"></label></div>
+  <div class="fld" style="margin-top:10px"><span>Notes</span><div class="row"><input class="inp" data-sf="notes" value="${esc(f.notes)}">${micBtn('saleNotes')}</div></div></div>
   <button class="btn block" id="saveSale" ${sale.busy||sale.saving?'disabled':''} style="padding:15px;font-size:17px;background:var(--ok)">${sale.saving?'Saving…':'Save sale'+(f.lines.some(l=>l.fromStock&&l.group)?' + take out of stock':'')}</button>
   <button class="btn ghost block" id="cancelSale" style="margin-top:8px">Cancel</button>`;
 }
@@ -1387,6 +1396,95 @@ function showTemp(email,pw,users){
   <button class="btn block" id="copyTemp" data-msg="${esc(msg)}">Copy sign-in details</button><a class="btn block" style="background:#1FA855;text-decoration:none;margin-top:8px" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${IC.wa.replace('<svg','<svg width="20" height="20"')} Send on WhatsApp</a>
   <button class="btn ghost block" style="margin-top:8px" id="backUsers">Back to users</button>`);
 }
+
+/* ================= VOICE: speak instead of typing ================= */
+const MIC={on:false,busy:false,target:'',rec:null,stream:null,chunks:[],t0:0,timer:null,d:null,partial:''};
+function micAvail(){return MODE==='claude'?!!K.dict:MODE==='sheet'?!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder):false}
+function micBtn(target,label){return micAvail()?`<button type="button" class="micb${MIC.on&&MIC.target===target?' rec':''}" data-mic="${target}" aria-label="Speak">${MIC.on&&MIC.target===target?'■':'🎤'}${label?' '+label:''}</button>`:''}
+function micStatus(msg){let el=$('#micbar');if(!el){el=document.createElement('div');el.id='micbar';document.body.appendChild(el)}if(!msg){el.remove();return}el.innerHTML=msg}
+function micTick(){const s=Math.floor((Date.now()-MIC.t0)/1000);micStatus(`<span class="dotrec"></span> Listening… ${s}s — tap ■ to finish${MIC.partial?'<br><i>'+esc(MIC.partial)+'</i>':''}`);if(s>=90)micStop()}
+async function micToggle(target,btn){
+  if(MIC.busy)return;
+  if(MIC.on){if(MIC.target===target)return micStop();await micStop()}
+  MIC.target=target;MIC.partial='';
+  if(MODE==='claude'){ // Claude dictation: start() must run straight from the tap
+    const d=K.dict;MIC.text='';
+    d.onPartial&&d.onPartial(({text})=>{MIC.partial=text;micTick()});
+    d.onFinal&&d.onFinal(({text})=>{MIC.text=(MIC.text?MIC.text+' ':'')+text;MIC.partial=''});
+    d.onState&&d.onState(({state})=>{if(state==='idle'&&MIC.on){MIC.on=false;clearInterval(MIC.timer);micDone(MIC.text||'')}});
+    d.start().then(()=>{}).catch(e=>{MIC.on=false;clearInterval(MIC.timer);micStatus('');toast(e&&e.code==='not_granted'?'Microphone not allowed — you can type instead':'Mic could not start');refreshMicButtons()});
+    MIC.on=true;MIC.t0=Date.now();MIC.timer=setInterval(micTick,500);micTick();refreshMicButtons();return;
+  }
+  try{
+    MIC.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+    MIC.chunks=[];MIC.rec=new MediaRecorder(MIC.stream);
+    MIC.rec.ondataavailable=e=>{if(e.data&&e.data.size)MIC.chunks.push(e.data)};
+    MIC.rec.onstop=async()=>{MIC.stream.getTracks().forEach(t=>t.stop());const blob=new Blob(MIC.chunks,{type:MIC.rec.mimeType||'audio/webm'});await micTranscribe(blob)};
+    MIC.rec.start();MIC.on=true;MIC.t0=Date.now();MIC.timer=setInterval(micTick,500);micTick();refreshMicButtons();
+  }catch(e){toast(e&&e.name==='NotAllowedError'?'Allow the microphone for this site in your browser settings':'Microphone not available on this device');MIC.on=false}
+}
+async function micStop(){
+  if(!MIC.on)return;clearInterval(MIC.timer);MIC.on=false;refreshMicButtons();
+  if(MODE==='claude'){micStatus('Finishing…');try{await K.dict.stop()}catch(e){}return} // onState → micDone
+  if(MIC.rec&&MIC.rec.state!=='inactive')MIC.rec.stop();
+}
+async function toWav16k(blob){ // any recorded format → small 16 kHz mono WAV that the AI accepts everywhere
+  const ab=await blob.arrayBuffer();const AC=window.AudioContext||window.webkitAudioContext;const ac=new AC();
+  const buf=await new Promise((res,rej)=>ac.decodeAudioData(ab,res,rej));ac.close&&ac.close();
+  const rate=16000,len=Math.ceil(buf.duration*rate);const off=new OfflineAudioContext(1,len,rate);const src=off.createBufferSource();src.buffer=buf;src.connect(off.destination);src.start();
+  const out=(await off.startRendering()).getChannelData(0);
+  const view=new DataView(new ArrayBuffer(44+out.length*2));const w=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i))};
+  w(0,'RIFF');view.setUint32(4,36+out.length*2,true);w(8,'WAVE');w(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,rate,true);view.setUint32(28,rate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);w(36,'data');view.setUint32(40,out.length*2,true);
+  for(let i=0;i<out.length;i++){const v=Math.max(-1,Math.min(1,out[i]));view.setInt16(44+i*2,v<0?v*0x8000:v*0x7fff,true)}
+  return new Blob([view],{type:'audio/wav'});
+}
+async function micTranscribe(blob){
+  MIC.busy=true;micStatus('<span class="spin" style="display:inline-block;vertical-align:middle;width:14px;height:14px"></span> Converting speech to text…');
+  try{
+    const wav=await toWav16k(blob);
+    const data=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(wav)});
+    const j=await SB.post({action:'transcribe',audio:data});
+    await micDone(j.text||'');
+  }catch(e){micStatus('');toast('Could not convert speech: '+(e.message||''))}
+  MIC.busy=false;refreshMicButtons();
+}
+function appendTo(v,t){return v?String(v).replace(/\s+$/,'')+(/[.!?]$/.test(String(v).trim())?' ':'. ')+t:t}
+async function micDone(text){
+  text=String(text||'').trim();micStatus('');refreshMicButtons();
+  if(!text){toast('Didn’t catch that — try again, closer to the phone');return}
+  const t=MIC.target;
+  if(t==='snapNotes'){snap.form.notes=appendTo(snap.form.notes,text);renderView()}
+  else if(t==='invNotes'){inv.f.notes=appendTo(inv.f.notes,text);renderView()}
+  else if(t==='saleNotes'){sale.f.notes=appendTo(sale.f.notes,text);renderView()}
+  else if(t==='ask'){const q=$('#askQ');if(q){q.value=text;askStock()}}
+  else if(t==='search'){ui.q=text;const s=$('#sq');if(s)s.value=text;renderList()}
+  else if(t==='snapAll')await speakDetails(text);
+  toast('✓ '+text.slice(0,60)+(text.length>60?'…':''));
+}
+async function speakDetails(text){
+  snap.active=true;snap.busy=true;snap.err='';renderView();
+  try{
+    const o=await BE().json(`A salesperson at TL Pathak Group (Indian industrial machinery dealer) described a machine by voice for the stock list. Transcript (already in English):
+"""${text.slice(0,3000)}"""
+Extract ONLY what was said — leave a field "" (or [] / 0) if not mentioned. Machine-trade headline size: lathe bed length in ft, drill capacity mm, press tonnage, pallet truck/hoist capacity in tons, etc.
+group = "<Type> · <Size>"; if one of these existing groups is the same kind and size, return it EXACTLY: ${JSON.stringify(allGroups().slice(0,150))}
+category one of ${JSON.stringify(CATS)} (or ""), condition one of ${JSON.stringify(COND)} (or "").
+notes = anything else useful that was said (colour, accessories, bay/location in the godown, damage) — short.
+Reply ONLY JSON: {"name":"","category":"","type":"","size":"","group":"","brand":"","model":"","serial":"","condition":"","qty":0,"specs":[{"label":"","value":""}],"notes":""}`);
+    const f=snap.form;
+    for(const k of ['name','type','size','brand','model','serial'])if(typeof o[k]==='string'&&o[k].trim())f[k]=o[k].trim().slice(0,140);
+    if(o.group&&String(o.group).trim()){f.group=String(o.group).trim().slice(0,90);snap.groupTouched=true}else if(!snap.groupTouched&&(f.type||f.size))f.group=[f.type,f.size].filter(Boolean).join(' · ');
+    if(CATS.includes(o.category))f.category=o.category;if(COND.includes(o.condition))f.condition=o.condition;
+    if(num(o.qty)>0)f.qty=Math.round(num(o.qty));
+    if(Array.isArray(o.specs))o.specs.filter(s=>s&&s.label&&s.value).forEach(s=>{const ex=f.specs.find(x=>x.label.toLowerCase()===String(s.label).toLowerCase());if(ex)ex.value=String(s.value).slice(0,80);else f.specs.push({label:String(s.label).slice(0,40),value:String(s.value).slice(0,80)})});
+    if(o.notes)f.notes=appendTo(f.notes,String(o.notes).slice(0,300));
+    if(!f.name&&f.group)f.name=f.group;
+    snap.aiDone=true;f.tip='Filled from your voice — check and fix anything below.';
+  }catch(e){snap.err=aiErr(e);if(!snap.form.notes)snap.form.notes=text}
+  snap.busy=false;renderView();
+}
+function refreshMicButtons(){document.querySelectorAll('.micb').forEach(b=>{const on=MIC.on&&MIC.target===b.dataset.mic;b.classList.toggle('rec',on);const lbl=b.textContent.replace(/^(?:\u{1F3A4}|\u25A0)\s?/u,'');b.textContent=(on?'■':'🎤')+(lbl?' '+lbl:'')})}
+
 /* ================= boot ================= */
 let namesBusy=false;
 async function resolveNames(){if(!K.user||!K.user.profiles||namesBusy)return;const ids=[...new Set([...S.items.flatMap(i=>[i.addedBy,i.updatedBy]),...S.log.map(l=>l.by),...S.purchases.map(p=>p.by),...S.sales.map(p=>p.by)].filter(x=>x&&typeof x==='string'&&!(x in names)))];if(!ids.length)return;namesBusy=true;try{const ps=await K.user.profiles(ids);ids.forEach(id=>{names[id]=(ps&&ps[id]&&ps[id].name)||'Someone'});render()}catch(e){}namesBusy=false}
@@ -1410,6 +1508,7 @@ renderView();
   K.sample=await window.claude.use('sample');
   if(K.sample){try{const l=await K.sample.limits();K.aiImages=!!(l&&l.images)}catch(e){K.aiImages=false}}
   if(K.canEdit)K.assets=await window.claude.use('assets');
+  try{K.dict=await window.claude.use('dictation')}catch(e){K.dict=null}
   renderView();
   await CB.init();
 })();
