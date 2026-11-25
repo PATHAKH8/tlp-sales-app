@@ -361,13 +361,13 @@ function summary_(q, location) {
 }
 
 /* ---------------- Gemini ---------------- */
-function gemini_(parts, json) {
+function gemini_(parts, json, temp) {
   const key = P.getProperty('GEMINI_KEY');
   if (!key) throw new Error('GEMINI_KEY not set in Script properties');
   const model = P.getProperty('GEMINI_MODEL') || 'gemini-3.8-flash';
   const res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(key), {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    payload: JSON.stringify({ contents: [{ role: 'user', parts: parts }], generationConfig: json ? { responseMimeType: 'application/json', temperature: 0.2 } : { temperature: 0.3 } })
+    payload: JSON.stringify({ contents: [{ role: 'user', parts: parts }], generationConfig: json ? { responseMimeType: 'application/json', temperature: 0.2 } : { temperature: temp === undefined ? 0.3 : temp } })
   });
   const j = JSON.parse(res.getContentText());
   if (j.error) throw new Error('Gemini: ' + j.error.message);
@@ -675,8 +675,10 @@ function transcribe_(d) {
     { text: 'This is a short voice note from a salesperson at an industrial machinery showroom in India (lathes, drills, presses, pallet trucks, construction machines). ' +
       'Write down what they said as clear English text. If they spoke Hindi, Bengali or a mix, translate it to English. ' +
       'Keep numbers, sizes and units (ft, inch, mm, ton, HP, kW), model codes, serial numbers, names and phone numbers exactly. ' +
-      'Do not add anything that was not said. If there is no speech, reply with nothing. Reply with only the text.' },
+      'Write ONLY words that are clearly spoken in this recording — never guess, complete or invent anything. ' +
+      'If there is no clear human speech (silence, noise, music, a beep), reply with exactly: NO_SPEECH. Reply with only the text.' },
     { inline_data: { mime_type: m[1], data: m[2] } }
-  ], false);
-  return String(txt || '').trim().replace(/^"|"$/g, '');
+  ], false, 0);
+  const out = String(txt || '').trim().replace(/^"|"$/g, '');
+  return /NO_SPEECH/i.test(out) ? '' : out;
 }

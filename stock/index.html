@@ -1433,6 +1433,9 @@ async function toWav16k(blob){ // any recorded format → small 16 kHz mono WAV 
   const buf=await new Promise((res,rej)=>ac.decodeAudioData(ab,res,rej));ac.close&&ac.close();
   const rate=16000,len=Math.ceil(buf.duration*rate);const off=new OfflineAudioContext(1,len,rate);const src=off.createBufferSource();src.buffer=buf;src.connect(off.destination);src.start();
   const out=(await off.startRendering()).getChannelData(0);
+  let peak=0,sq=0;for(let i=0;i<out.length;i++){const v=Math.abs(out[i]);if(v>peak)peak=v;sq+=v*v}
+  const rms=Math.sqrt(sq/Math.max(1,out.length));
+  if(buf.duration<0.6||peak<0.04||rms<0.006)throw new Error('No voice heard — hold the phone closer and speak clearly');
   const view=new DataView(new ArrayBuffer(44+out.length*2));const w=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i))};
   w(0,'RIFF');view.setUint32(4,36+out.length*2,true);w(8,'WAVE');w(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,rate,true);view.setUint32(28,rate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);w(36,'data');view.setUint32(40,out.length*2,true);
   for(let i=0;i<out.length;i++){const v=Math.max(-1,Math.min(1,out[i]));view.setInt16(44+i*2,v<0?v*0x8000:v*0x7fff,true)}
@@ -1445,7 +1448,7 @@ async function micTranscribe(blob){
     const data=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(wav)});
     const j=await SB.post({action:'transcribe',audio:data});
     await micDone(j.text||'');
-  }catch(e){micStatus('');toast('Could not convert speech: '+(e.message||''))}
+  }catch(e){micStatus('');toast(/No voice heard/.test(e.message||'')?e.message:'Could not convert speech: '+(e.message||''))}
   MIC.busy=false;refreshMicButtons();
 }
 function appendTo(v,t){return v?String(v).replace(/\s+$/,'')+(/[.!?]$/.test(String(v).trim())?' ':'. ')+t:t}
