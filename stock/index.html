@@ -1428,6 +1428,16 @@ async function micStop(){
   if(MODE==='claude'){micStatus('Finishing…');try{await K.dict.stop()}catch(e){}return} // onState → micDone
   if(MIC.rec&&MIC.rec.state!=='inactive')MIC.rec.stop();
 }
+// Simple voice check: speech rises and falls (syllables) and has voiced parts with a low zero-crossing rate.
+// Silence, fan noise, hum and hiss don't — and the AI must never be sent those, because it may "hear" words in them.
+function hasVoice(x){
+  const F=320,E=[],Z=[];for(let i=0;i+F<=x.length;i+=F){let e=0,z=0;for(let j=i;j<i+F;j++){e+=x[j]*x[j];if(j>i&&(x[j]>=0)!==(x[j-1]>=0))z++}E.push(Math.sqrt(e/F));Z.push(z/F)}
+  if(E.length<20)return false;
+  const sorted=[...E].sort((a,b)=>a-b),floor=sorted[Math.floor(E.length*0.2)]||0,top=sorted[Math.floor(E.length*0.95)]||0;
+  const mean=E.reduce((a,b)=>a+b,0)/E.length,sd=Math.sqrt(E.reduce((a,b)=>a+(b-mean)*(b-mean),0)/E.length);
+  const loud=E.map((e,i)=>e>Math.max(floor*3,0.006)&&Z[i]<0.22).filter(Boolean).length;   // voiced, clearly above background
+  return top>Math.max(floor*4,0.012)&&sd/(mean||1)>0.45&&loud>=Math.max(8,E.length*0.08);
+}
 async function toWav16k(blob){ // any recorded format → small 16 kHz mono WAV that the AI accepts everywhere
   const ab=await blob.arrayBuffer();const AC=window.AudioContext||window.webkitAudioContext;const ac=new AC();
   const buf=await new Promise((res,rej)=>ac.decodeAudioData(ab,res,rej));ac.close&&ac.close();
@@ -1435,7 +1445,8 @@ async function toWav16k(blob){ // any recorded format → small 16 kHz mono WAV 
   const out=(await off.startRendering()).getChannelData(0);
   let peak=0,sq=0;for(let i=0;i<out.length;i++){const v=Math.abs(out[i]);if(v>peak)peak=v;sq+=v*v}
   const rms=Math.sqrt(sq/Math.max(1,out.length));
-  if(buf.duration<0.6||peak<0.04||rms<0.006)throw new Error('No voice heard — hold the phone closer and speak clearly');
+  if(buf.duration<0.6||peak<0.015||rms<0.002)throw new Error('No voice heard — hold the phone closer and speak clearly');
+  if(!hasVoice(out))throw new Error('No voice heard — hold the phone closer and speak clearly');
   const view=new DataView(new ArrayBuffer(44+out.length*2));const w=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i))};
   w(0,'RIFF');view.setUint32(4,36+out.length*2,true);w(8,'WAVE');w(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,rate,true);view.setUint32(28,rate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);w(36,'data');view.setUint32(40,out.length*2,true);
   for(let i=0;i<out.length;i++){const v=Math.max(-1,Math.min(1,out[i]));view.setInt16(44+i*2,v<0?v*0x8000:v*0x7fff,true)}
