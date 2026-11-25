@@ -367,7 +367,7 @@ function gemini_(parts, json, temp) {
   const model = P.getProperty('GEMINI_MODEL') || 'gemini-3.8-flash';
   const res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(key), {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    payload: JSON.stringify({ contents: [{ role: 'user', parts: parts }], generationConfig: json ? { responseMimeType: 'application/json', temperature: 0.2 } : { temperature: temp === undefined ? 0.3 : temp } })
+    payload: JSON.stringify({ contents: [{ role: 'user', parts: parts }], generationConfig: json ? { responseMimeType: 'application/json', temperature: temp === undefined ? 0.2 : temp } : { temperature: temp === undefined ? 0.3 : temp } })
   });
   const j = JSON.parse(res.getContentText());
   if (j.error) throw new Error('Gemini: ' + j.error.message);
@@ -671,14 +671,15 @@ function transcribe_(d) {
   const m = d.match(/^data:(audio\/[\w.+-]+);base64,(.+)$/);
   if (!m) throw new Error('No audio received');
   if (m[2].length > 8e6) throw new Error('Recording too long — keep it under 90 seconds');
-  const txt = gemini_([
-    { text: 'This is a short voice note from a salesperson at an industrial machinery showroom in India (lathes, drills, presses, pallet trucks, construction machines). ' +
-      'Write down what they said as clear English text. If they spoke Hindi, Bengali or a mix, translate it to English. ' +
-      'Keep numbers, sizes and units (ft, inch, mm, ton, HP, kW), model codes, serial numbers, names and phone numbers exactly. ' +
-      'Write ONLY words that are clearly spoken in this recording — never guess, complete or invent anything. ' +
-      'If there is no clear human speech (silence, noise, music, a beep), reply with exactly: NO_SPEECH. Reply with only the text.' },
+  // No topic hints in this prompt on purpose: hints make the model "hear" words in silence or noise.
+  const raw = gemini_([
+    { text: 'Listen to this audio clip. First decide honestly whether it contains clear human speech. ' +
+      'If it does, write exactly what was said as clear English (translate Hindi, Bengali or mixed speech to English), ' +
+      'keeping numbers, units, codes and names exactly. Never guess, complete or add words that were not spoken. ' +
+      'Reply ONLY JSON: {"speech": true or false, "text": "..."} — use {"speech": false, "text": ""} for silence, noise, music or tones.' },
     { inline_data: { mime_type: m[1], data: m[2] } }
-  ], false, 0);
-  const out = String(txt || '').trim().replace(/^"|"$/g, '');
-  return /NO_SPEECH/i.test(out) ? '' : out;
+  ], true);
+  let o = {}; try { o = JSON.parse(String(raw).replace(/^```(json)?|```$/g, '').trim()); } catch (e) { return ''; }
+  const t = String(o.text || '').trim();
+  return o.speech === true && t && !/NO_SPEECH/i.test(t) ? t : '';
 }
